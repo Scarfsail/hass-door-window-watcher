@@ -1,0 +1,5 @@
+{
+    "name": "Door Window Watcher",
+    "render_readme": true,
+    "homeassistant": "2025.1.0"
+}

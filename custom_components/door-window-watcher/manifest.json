@@ -1,0 +1,9 @@
+{
+    "domain": "door_window_watcher",
+    "name": "Door Window Watcher",
+    "version": "1.0.0",
+    "codeowners": ["@scarfsail"],
+    "requirements": [],
+    "iot_class":"local_push",
+    "config_flow": true
+  }
