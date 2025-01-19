@@ -1,9 +1,13 @@
 {
-    "domain": "door_window_watcher",
+    "domain": "door-window-watcher",
     "name": "Door Window Watcher",
     "version": "1.0.0",
     "codeowners": ["@scarfsail"],
     "requirements": [],
     "iot_class":"local_poll",
+    "dependencies": [
+      "http",
+      "panel_custom"
+    ],
     "config_flow": true
   }

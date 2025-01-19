@@ -1,8 +1,10 @@
 import logging
+
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .panel import async_register_panel, async_unregister_panel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -14,24 +16,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
 
-    #hass.data[DOMAIN][entry.entry_id]["client"] = client
+    # hass.data[DOMAIN][entry.entry_id]["client"] = client
 
     # Forward setup for the sensor platform
-    #await hass.config_entries.async_forward_entry_setups(
+    # await hass.config_entries.async_forward_entry_setups(
     #    entry,
     #    ["sensor", "binary_sensor", "button", "switch", "light", "cover", "number"],
-    #)
+    # )
 
-    #entry.async_on_unload(
+    # entry.async_on_unload(
     #    # only start after all platforms have had a chance to subscribe
     #    client.connect()
-    #)
+    # )
+
+    await async_register_panel(hass)
 
     return True
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Unload a config entry."""
-    #client = hass.data[DOMAIN][entry.entry_id]["client"]
-    #client.stop()
+    # client = hass.data[DOMAIN][entry.entry_id]["client"]
+    # client.stop()
+    async_unregister_panel(hass)
     return True
