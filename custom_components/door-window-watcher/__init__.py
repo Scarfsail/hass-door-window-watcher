@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .panel import async_register_panel, async_unregister_panel
+from .websockets import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -31,6 +32,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     await async_register_panel(hass)
 
+    # Websocket support
+    await async_register_websocket_commands(hass)
     return True
 
 
