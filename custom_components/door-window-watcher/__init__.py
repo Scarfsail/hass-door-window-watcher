@@ -5,6 +5,7 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .panel import async_register_panel, async_unregister_panel
+from .store import DoorWindowWatcherData
 from .websockets import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -12,10 +13,13 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up integration from a config entry."""
+    # Create and load the data store
 
-    # hub_connection.on("iosChanged", lambda data: process_iosChanged(hass, data))
+    data_store = DoorWindowWatcherData(hass)
+    await data_store.async_load()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
+    hass.data[DOMAIN]["data_store"] = data_store
 
     # hass.data[DOMAIN][entry.entry_id]["client"] = client
 

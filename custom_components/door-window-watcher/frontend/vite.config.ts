@@ -16,7 +16,17 @@ export default defineConfig(({ mode }) => {
             outDir: './dist',
             assetsDir: "compiled",
             sourcemap: !isProduction, // Enable source maps in development mode
-            minify: isProduction // Minify only in production mode
+            minify: isProduction, // Minify only in production mode
+            rollupOptions: {
+                // Use a regex or string array to mark modules as external
+                external: [
+                  // Either a specific path:
+                  "@home-assistant/frontend/src/components/ha-entity-picker",
+          
+                  // Or a more general regex to match anything starting with @home-assistant/frontend
+                  /^@home-assistant\/frontend/,
+                ],
+              },            
         },
         /*
         esbuild: {
