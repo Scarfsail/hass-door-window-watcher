@@ -1,4 +1,4 @@
-DOMAIN = "door-window-watcher"
+DOMAIN = "door_window_watcher"
 NAME = "Door Window Watcher"
 
 CUSTOM_COMPONENTS = "custom_components"

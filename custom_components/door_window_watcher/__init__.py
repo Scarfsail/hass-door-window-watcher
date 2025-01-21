@@ -1,7 +1,12 @@
 import logging
 
+import attr
+from httpx import get
+import voluptuous as vol
+
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, SupportsResponse
+from homeassistant.helpers import config_validation as cv, entity_platform
 
 from .const import DOMAIN
 from .panel import async_register_panel, async_unregister_panel
@@ -29,6 +34,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
 
     # Websocket support
     await async_register_websocket_commands(hass)
+    register_services(hass)
+
     return True
 
 
@@ -38,3 +45,23 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     # client.stop()
     async_unregister_panel(hass)
     return True
+
+
+def register_services(hass: HomeAssistant):
+    """Register integration-level services."""
+
+    def get_open_sensors(call):
+        """Handle the service call."""
+        only_alarms = call.data.get("only_alarms", False)
+        processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
+        sensors = processor.get_open_sensors(only_alarms)
+        serialized = {"open_sensors:": [attr.asdict(sensor) for sensor in sensors]}
+        return serialized
+
+    hass.services.async_register(
+        DOMAIN,
+        "get_open_sensors",
+        get_open_sensors,
+        schema=vol.Schema({vol.Optional("only_alarms"): cv.boolean}),
+        supports_response=SupportsResponse.ONLY,
+    )

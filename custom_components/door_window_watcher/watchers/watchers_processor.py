@@ -5,7 +5,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.event import async_track_time_interval
 
 from ..watchers_config_store import ConfigChangeObserver, WatchersConfigStore
-from .watcher_group_processor_base import WatcherGroupProcessorBase
+from .watcher_group_processor_base import OpenSensorInfo, WatcherGroupProcessorBase
 from .watcher_group_processor_fixed import WatcherGroupProcessorFixed
 from .watcher_group_processor_temperature import WatcherGroupProcessorTemperature
 
@@ -22,6 +22,13 @@ class WatchersProcessor(ConfigChangeObserver):
             hass, self._handle_timer_tick, timedelta(seconds=1)
         )
         self._store.add_observer(self)
+
+    def get_open_sensors(self, only_alarms: bool = False) -> list[OpenSensorInfo]:
+        """Get all open sensors."""
+        open_sensors = []
+        for processor in self._processors:
+            open_sensors.extend(processor.get_open_sensors(only_alarms))
+        return open_sensors
 
     def adjust_remaining_seconds(
         self, group_id: int, entity_id: str, seconds: int

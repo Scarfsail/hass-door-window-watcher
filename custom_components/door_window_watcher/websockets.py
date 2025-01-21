@@ -12,7 +12,7 @@ from .watchers_config_store import WatchersConfigStore
 def ws_get_config(hass, connection, msg):
     """Return the stored config as JSON."""
     store: WatchersConfigStore = hass.data[DOMAIN]["data_store"]
-    connection.send_result(msg["id"], store.config_dict)
+    connection.send_result(msg["id"], store.config)
 
 
 @callback

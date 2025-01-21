@@ -1,0 +1,5 @@
+get_open_sensors:
+  fields:
+    only_alarms:
+      required: false
+      example: true

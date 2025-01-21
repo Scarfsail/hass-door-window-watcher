@@ -38,6 +38,11 @@ class WatcherGroupProcessorBase(ABC):
         self._unsubscribe_state()
         self.open_sensors.clear()
 
+    def get_open_sensors(self, only_alarms: bool = False) -> list[OpenSensorInfo]:
+        """Get all open sensors."""
+        sensors = self.open_sensors.values()
+        return filter(lambda x: x.alarm_triggered, sensors) if only_alarms else sensors
+
     def update_open_sensors(self) -> Boolean:
         """Update remaining time for open sensors."""
         changed = False
@@ -96,7 +101,7 @@ class WatcherGroupProcessorBase(ABC):
         if new_state is None:
             return
 
-        if new_state.state == "on":
+        if new_state.state == "off":
             if entity_id not in self.open_sensors:
                 sensor = OpenSensorInfo(entity_id=entity_id, opened_at=datetime.now())
                 self._calculate_remaining_seconds(sensor)

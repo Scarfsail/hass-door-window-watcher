@@ -27,13 +27,15 @@ class WatcherGroupProcessorTemperature(WatcherGroupProcessorBase):
 
         if outdoor_temp is None or indoor_temp is None:
             return 0
-
-        if outdoor_temp >= self._group["maxTemperture"]:
+        max_temperature = float(self._group["maxTemperture"])
+        if outdoor_temp >= max_temperature:
             return 0
 
         temp_diff = indoor_temp - outdoor_temp
         if temp_diff <= 0:
             return 0
 
-        ratio = self._group["temperatureDiff"] / temp_diff
-        return timedelta(seconds=int(self._group["timeDiff"] * ratio))
+        set_temp_diff = float(self._group["temperatureDiff"])
+        time_diff = float(self._group["timeDiff"])
+        ratio = set_temp_diff / temp_diff
+        return timedelta(seconds=int(time_diff * ratio))

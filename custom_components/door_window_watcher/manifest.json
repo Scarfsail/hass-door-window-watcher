@@ -1,5 +1,5 @@
 {
-    "domain": "door-window-watcher",
+    "domain": "door_window_watcher",
     "name": "Door Window Watcher",
     "version": "1.0.0",
     "codeowners": ["@scarfsail"],
