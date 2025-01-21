@@ -1,25 +1,25 @@
 import voluptuous as vol
 
 from homeassistant.components import websocket_api
-from homeassistant.components.websocket_api import async_register_command, decorators
+from homeassistant.components.websocket_api import async_register_command
 from homeassistant.core import HomeAssistant, callback
 
 from .const import DOMAIN
-from .store import DoorWindowWatcherData
+from .watchers_config_store import WatchersConfigStore
 
 
 @callback
 def ws_get_config(hass, connection, msg):
     """Return the stored config as JSON."""
-    store: DoorWindowWatcherData = hass.data[DOMAIN]["data_store"]
-    connection.send_result(msg["id"], store.data)
+    store: WatchersConfigStore = hass.data[DOMAIN]["data_store"]
+    connection.send_result(msg["id"], store.config_dict)
 
 
 @callback
 def ws_save_config(hass, connection, msg):
     """Save new config to the store."""
-    store: DoorWindowWatcherData = hass.data[DOMAIN]["data_store"]
-    store.data = msg["config"]
+    store: WatchersConfigStore = hass.data[DOMAIN]["data_store"]
+    store.config = msg["config"]
     hass.async_create_task(store.async_save())
 
     connection.send_result(msg["id"], {"success": True})

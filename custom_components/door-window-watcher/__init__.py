@@ -5,7 +5,8 @@ from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
 from .panel import async_register_panel, async_unregister_panel
-from .store import DoorWindowWatcherData
+from .watchers.watchers_processor import WatchersProcessor
+from .watchers_config_store import WatchersConfigStore
 from .websockets import async_register_websocket_commands
 
 _LOGGER = logging.getLogger(__name__)
@@ -13,27 +14,17 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     """Set up integration from a config entry."""
-    # Create and load the data store
-
-    data_store = DoorWindowWatcherData(hass)
-    await data_store.async_load()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {}
+
+    # Create and load the data store
+    data_store = WatchersConfigStore(hass)
+
     hass.data[DOMAIN]["data_store"] = data_store
+    hass.data[DOMAIN]["watchers_processor"] = WatchersProcessor(hass, data_store)
+    await data_store.async_load()
 
-    # hass.data[DOMAIN][entry.entry_id]["client"] = client
-
-    # Forward setup for the sensor platform
-    # await hass.config_entries.async_forward_entry_setups(
-    #    entry,
-    #    ["sensor", "binary_sensor", "button", "switch", "light", "cover", "number"],
-    # )
-
-    # entry.async_on_unload(
-    #    # only start after all platforms have had a chance to subscribe
-    #    client.connect()
-    # )
-
+    # Register the UI panel
     await async_register_panel(hass)
 
     # Websocket support

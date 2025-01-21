@@ -14,6 +14,8 @@ export interface WatcherGroupFixed extends WatcherGroupBase {
 
 export interface WatcherGroupTemperature extends WatcherGroupBase {
     type: "temperature"
+    outdoorTemperaureEntity: string
+    indoorTemperaureEntity: string    
     temperatureDiff: number
     timeDiff: number
     maxTemperture: number

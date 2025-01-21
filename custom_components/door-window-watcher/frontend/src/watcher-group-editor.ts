@@ -66,6 +66,9 @@ export class WatcherGroupEditor extends LitElement {
     }
     private renderParamsTemperature(group: WatcherGroupTemperature) {
         return html`
+            <ha-entity-picker .hass=${this.hass} required .value=${group.indoorTemperaureEntity} .includeDomains=${["sensor"]} label="Select indoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("indoorTemperaureEntity", e.detail.value)}></ha-entity-picker> 
+            <ha-entity-picker .hass=${this.hass} required .value=${group.outdoorTemperaureEntity} .includeDomains=${["sensor"]} label="Select outdoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("outdoorTemperaureEntity", e.detail.value)}></ha-entity-picker> 
+
             <ha-textfield .label=${"Temperature difference"} .value=${group.temperatureDiff} @change=${(e: any) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
             <ha-textfield .label=${"Time difference"} .value=${group.timeDiff} @change=${(e: any) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
             <ha-textfield .label=${"Max temperature"} .value=${group.maxTemperture} @change=${(e: any) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>
@@ -85,7 +88,7 @@ export class WatcherGroupEditor extends LitElement {
             .hass=${this.hass}
             .value=${entity}
             .entityFilter=${(stateObj: HassEntity) => ["door", "garage_door"].includes(stateObj.attributes.device_class!)}
-            domainFilter="binary_sensor"
+            includeDomains="binary_sensor"
             label="Select door or window"
             @value-changed=${(e: CustomEvent) => this.entityPicked(index, e.detail.value)}
             ></ha-entity-picker> 
