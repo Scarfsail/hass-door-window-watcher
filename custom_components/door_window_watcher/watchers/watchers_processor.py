@@ -23,11 +23,11 @@ class WatchersProcessor(ConfigChangeObserver):
         )
         self._store.add_observer(self)
 
-    def get_open_sensors(self, only_alarms: bool = False) -> list[OpenSensorInfo]:
+    def get_open_sensors(self, only_alerts: bool = False) -> list[OpenSensorInfo]:
         """Get all open sensors."""
         open_sensors = []
         for processor in self._processors:
-            open_sensors.extend(processor.get_open_sensors(only_alarms))
+            open_sensors.extend(processor.get_open_sensors(only_alerts))
         return open_sensors
 
     def adjust_remaining_seconds(
@@ -37,10 +37,10 @@ class WatchersProcessor(ConfigChangeObserver):
         if 0 <= group_id < len(self._processors):
             self._processors[group_id].adjust_remaining_seconds(entity_id, seconds)
 
-    def dismiss_alarm(self, group_id: int, entity_id: str) -> None:
-        """Dismiss alarm for an open sensor in a specific group."""
+    def dismiss_alert(self, group_id: int, entity_id: str) -> None:
+        """Dismiss alert for an open sensor in a specific group."""
         if 0 <= group_id < len(self._processors):
-            self._processors[group_id].dismiss_alarm(entity_id)
+            self._processors[group_id].dismiss_alert(entity_id)
 
     async def dispose(self) -> None:
         """Cleanup all processors."""

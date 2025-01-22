@@ -52,9 +52,9 @@ def register_services(hass: HomeAssistant):
 
     def get_open_sensors(call):
         """Handle the service call."""
-        only_alarms = call.data.get("only_alarms", False)
+        only_alerts = call.data.get("only_alerts", False)
         processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
-        sensors = processor.get_open_sensors(only_alarms)
+        sensors = processor.get_open_sensors(only_alerts)
         serialized = {"open_sensors:": [attr.asdict(sensor) for sensor in sensors]}
         return serialized
 
@@ -62,6 +62,6 @@ def register_services(hass: HomeAssistant):
         DOMAIN,
         "get_open_sensors",
         get_open_sensors,
-        schema=vol.Schema({vol.Optional("only_alarms"): cv.boolean}),
+        schema=vol.Schema({vol.Optional("only_alerts"): cv.boolean}),
         supports_response=SupportsResponse.ONLY,
     )

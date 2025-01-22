@@ -1,15 +1,11 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
-from signal import alarm
 
 import attr
 from sqlalchemy import Boolean
 
 from homeassistant.core import Event, HomeAssistant, State
-from homeassistant.helpers.event import (
-    async_track_state_change_event,
-    async_track_time_interval,
-)
+from homeassistant.helpers.event import async_track_state_change_event
 
 from ..models import WatcherGroup
 
@@ -20,7 +16,7 @@ class OpenSensorInfo:
     opened_at: datetime = attr.ib()
     remaining_seconds: int = attr.ib(default=0)
     adjusted_seconds: int = attr.ib(default=0)
-    alarm_triggered: bool = attr.ib(default=False)
+    alert_triggered: bool = attr.ib(default=False)
 
 
 class WatcherGroupProcessorBase(ABC):
@@ -38,10 +34,10 @@ class WatcherGroupProcessorBase(ABC):
         self._unsubscribe_state()
         self.open_sensors.clear()
 
-    def get_open_sensors(self, only_alarms: bool = False) -> list[OpenSensorInfo]:
+    def get_open_sensors(self, only_alerts: bool = False) -> list[OpenSensorInfo]:
         """Get all open sensors."""
         sensors = self.open_sensors.values()
-        return filter(lambda x: x.alarm_triggered, sensors) if only_alarms else sensors
+        return filter(lambda x: x.alert_triggered, sensors) if only_alerts else sensors
 
     def update_open_sensors(self) -> Boolean:
         """Update remaining time for open sensors."""
@@ -60,13 +56,13 @@ class WatcherGroupProcessorBase(ABC):
         sensor.adjusted_seconds += seconds
         self._calculate_remaining_seconds(sensor)
 
-    def dismiss_alarm(self, entity_id: str) -> None:
-        """Dismiss alarm for an open sensor."""
+    def dismiss_alert(self, entity_id: str) -> None:
+        """Dismiss alert for an open sensor."""
         if entity_id not in self.open_sensors:
             return
 
         sensor = self.open_sensors[entity_id]
-        sensor.alarm_triggered = False
+        sensor.alert_triggered = False
 
     def _calculate_remaining_seconds(self, sensor: OpenSensorInfo) -> Boolean:
         prev_remaining_seconds = sensor.remaining_seconds
@@ -75,7 +71,7 @@ class WatcherGroupProcessorBase(ABC):
 
         if max_time == 0 and sensor.adjusted_seconds == 0:
             sensor.remaining_seconds = 0
-            sensor.alarm_triggered = False
+            sensor.alert_triggered = False
         else:
             elapsed = datetime.now() - sensor.opened_at
             remaining = (
@@ -88,9 +84,9 @@ class WatcherGroupProcessorBase(ABC):
             if (
                 sensor.remaining_seconds == 0
                 and prev_remaining_seconds > 0
-                and not sensor.alarm_triggered
+                and not sensor.alert_triggered
             ):
-                sensor.alarm_triggered = True
+                sensor.alert_triggered = True
 
         return prev_remaining_seconds != sensor.remaining_seconds
 
