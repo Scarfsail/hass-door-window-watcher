@@ -8,14 +8,10 @@ adjust_remaining_seconds:
   fields:
     entity_id:
       required: true
-    group_id:
-      required: true
     seconds:
       required: true
 
 dismiss_alert:
   fields:
     entity_id:
-      required: true
-    group_id:
       required: true

@@ -40,21 +40,28 @@ class WatchersProcessor(ConfigChangeObserver):
     def register_binary_alert_sensor(self, sensor: WatchersAlertSensorBase) -> None:
         self._binary_alert_sensor = sensor
 
-    def adjust_remaining_seconds(
-        self, group_id: int, entity_id: str, seconds: int
-    ) -> None:
+    def adjust_remaining_seconds(self, entity_id: str, seconds: int) -> None:
         """Adjust remaining time for an open sensor in a specific group."""
-        if 0 <= group_id < len(self._processors):
-            self._processors[group_id].adjust_remaining_seconds(entity_id, seconds)
-            if self._binary_alert_sensor:
-                self._binary_alert_sensor.update_state(self.get_open_sensors())
 
-    def dismiss_alert(self, group_id: int, entity_id: str) -> None:
+        self._get_processor_with_entity(entity_id).adjust_remaining_seconds(
+            entity_id, seconds
+        )
+        if self._binary_alert_sensor:
+            self._binary_alert_sensor.update_state(self.get_open_sensors())
+
+    def dismiss_alert(self, entity_id: str) -> None:
         """Dismiss alert for an open sensor in a specific group."""
-        if 0 <= group_id < len(self._processors):
-            self._processors[group_id].dismiss_alert(entity_id)
-            if self._binary_alert_sensor:
-                self._binary_alert_sensor.update_state(self.get_open_sensors())
+        self._get_processor_with_entity(entity_id).dismiss_alert(entity_id)
+        if self._binary_alert_sensor:
+            self._binary_alert_sensor.update_state(self.get_open_sensors())
+
+    def _get_processor_with_entity(self, entity_id: str) -> WatcherGroupProcessorBase:
+        """Find an entity by its entity_id."""
+        for processor in self._processors:
+            if entity_id in processor.group["entities"]:
+                return processor
+
+        raise ValueError(f"Entity '{entity_id}' not found in any watcher group")
 
     async def dispose(self) -> None:
         """Cleanup all processors."""

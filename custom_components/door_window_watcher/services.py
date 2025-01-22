@@ -27,7 +27,6 @@ def register_services(hass: HomeAssistant):
 
         def proceed():
             processor.adjust_remaining_seconds(
-                int(call.data["group_id"]),
                 call.data["entity_id"],
                 int(call.data["seconds"]),
             )
@@ -39,7 +38,7 @@ def register_services(hass: HomeAssistant):
         processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
 
         def proceed():
-            processor.dismiss_alert(int(call.data["group_id"]), call.data["entity_id"])
+            processor.dismiss_alert(call.data["entity_id"])
 
         run_callback_threadsafe(hass.loop, proceed)
 
@@ -58,7 +57,6 @@ def register_services(hass: HomeAssistant):
         schema=vol.Schema(
             {
                 vol.Required("entity_id"): cv.entity_id,
-                vol.Required("group_id"): cv.positive_int,
                 vol.Required("seconds"): cv.Number,
             }
         ),
@@ -72,7 +70,6 @@ def register_services(hass: HomeAssistant):
         schema=vol.Schema(
             {
                 vol.Required("entity_id"): cv.entity_id,
-                vol.Required("group_id"): cv.positive_int,
             }
         ),
         supports_response=SupportsResponse.NONE,
