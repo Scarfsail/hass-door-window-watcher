@@ -43,7 +43,7 @@ class WatcherGroupProcessorBase(ABC):
         """Update remaining time for open sensors."""
         changed = False
         for sensor in self.open_sensors.values():
-            changed = self._calculate_remaining_seconds(sensor)
+            changed |= self._calculate_remaining_seconds(sensor)
 
         return changed
 
@@ -53,7 +53,17 @@ class WatcherGroupProcessorBase(ABC):
             return
 
         sensor = self.open_sensors[entity_id]
-        sensor.adjusted_seconds += seconds
+        max_time = self._get_max_open_time()
+
+        if sensor.remaining_seconds == 0:
+            # When remaining time is zero, calculate time since alert was triggered
+            elapsed = datetime.now() - sensor.opened_at
+            time_since_alert = elapsed.total_seconds() - max_time.total_seconds()
+            sensor.adjusted_seconds = int(time_since_alert + seconds)
+        else:
+            # When there's remaining time, simply add to adjusted_seconds
+            sensor.adjusted_seconds += seconds
+
         self._calculate_remaining_seconds(sensor)
 
     def dismiss_alert(self, entity_id: str) -> None:
@@ -80,6 +90,13 @@ class WatcherGroupProcessorBase(ABC):
                 + sensor.adjusted_seconds
             )
             sensor.remaining_seconds = max(0, int(remaining))
+
+            if (
+                prev_remaining_seconds == 0
+                and sensor.remaining_seconds > 0
+                and sensor.alert_triggered
+            ):
+                sensor.alert_triggered = False
 
             if (
                 sensor.remaining_seconds == 0
