@@ -24,7 +24,7 @@ export class WatcherGroupsEditor extends LitElement {
     }
     addGroup() {
         const groups = [...this.groups!];
-        groups.push({ type: "fixed", title: "New group", entities: [], maxDurationSeconds: 60 });
+        groups.push({ type: "fixed", title: "New group", entities: [], maxDurationSeconds: 60, sensor_open_state: "on" });
         this.fireGroupsChanged(groups)
     }
 

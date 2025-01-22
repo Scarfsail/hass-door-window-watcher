@@ -43,6 +43,7 @@ export class WatcherGroupEditor extends LitElement {
                         .itemValuePath=${"value"}
                         @value-changed=${(e: CustomEvent) => this.groupParamChanged("type", e.detail.value)}>
                     </ha-combo-box>
+                    <ha-textfield .label=${"Sensor's open state"} .value=${this.group.sensor_open_state} @change=${(e: any) => this.groupParamChanged("sensor_open_state", e.target.value)}></ha-textfield>
                     ${this.group.type == "fixed" ? this.renderParamsFixed(this.group) : this.renderParamsTemperature(this.group)}
                     <h3>Door / Windows:</h3>
                     ${this.group.entities.map((entity, idx) => html`
@@ -68,7 +69,6 @@ export class WatcherGroupEditor extends LitElement {
         return html`
             <ha-entity-picker .hass=${this.hass} required .value=${group.indoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select indoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("indoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
             <ha-entity-picker .hass=${this.hass} required .value=${group.outdoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select outdoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("outdoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
-
             <ha-textfield .label=${"Temperature difference"} .value=${group.temperatureDiff} @change=${(e: any) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
             <ha-textfield .label=${"Time difference"} .value=${group.timeDiff} @change=${(e: any) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
             <ha-textfield .label=${"Max temperature"} .value=${group.maxTemperture} @change=${(e: any) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>

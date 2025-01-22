@@ -4,6 +4,7 @@ from typing import Literal, TypedDict
 class WatcherGroupBase(TypedDict, total=False):
     type: str
     title: str
+    sensor_open_state: str
     entities: list[str]
 
 

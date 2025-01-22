@@ -3,6 +3,7 @@ export type WatcherGroup = WatcherGroupFixed | WatcherGroupTemperature;
 export interface WatcherGroupBase {
     type: "fixed" | "temperature"
     title:string
+    sensor_open_state:string
     entities: string[]
 }
 

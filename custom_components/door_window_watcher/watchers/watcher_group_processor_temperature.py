@@ -11,19 +11,17 @@ class WatcherGroupProcessorTemperature(WatcherGroupProcessorBase):
         super().__init__(hass, group)
         self._group = group
 
-    def _get_outdoor_temperature(self) -> float | None:
-        """Get the current outdoor temperature."""
-        state = self.hass.states.get(self._group["outdoorTemperatureEntity"])
-        return float(state.state) if state else None
-
-    def _get_indoor_temperature(self) -> float | None:
+    def _get_entity_state(self, entity_id) -> float | None:
         """Get the current indoor temperature."""
-        state = self.hass.states.get(self._group["indoorTemperatureEntity"])
-        return float(state.state) if state else None
+        state = self.hass.states.get(self._group[entity_id])
+        if not state:
+            return None
+
+        return float(state.state) if state.state != "unavailable" else None
 
     def _get_max_open_time(self) -> timedelta | None:
-        outdoor_temp = self._get_outdoor_temperature()
-        indoor_temp = self._get_indoor_temperature()
+        outdoor_temp = self._get_entity_state("outdoorTemperatureEntity")
+        indoor_temp = self._get_entity_state("indoorTemperatureEntity")
 
         if outdoor_temp is None or indoor_temp is None:
             return 0

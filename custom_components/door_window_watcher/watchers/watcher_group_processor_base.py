@@ -101,7 +101,7 @@ class WatcherGroupProcessorBase(ABC):
         if new_state is None:
             return
 
-        if new_state.state == "off":
+        if new_state.state == self.group["sensor_open_state"]:
             if entity_id not in self.open_sensors:
                 sensor = OpenSensorInfo(entity_id=entity_id, opened_at=datetime.now())
                 self._calculate_remaining_seconds(sensor)
