@@ -36,6 +36,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     await async_register_websocket_commands(hass)
     register_services(hass)
 
+    # Forward setup for the sensor platform
+    await hass.config_entries.async_forward_entry_setups(
+        entry,
+        ["binary_sensor"],
+    )
     return True
 
 
