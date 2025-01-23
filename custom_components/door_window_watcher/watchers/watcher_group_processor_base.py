@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Callable
 from datetime import datetime, timedelta
 
 import attr
@@ -20,10 +21,16 @@ class OpenSensorInfo:
 
 
 class WatcherGroupProcessorBase(ABC):
-    def __init__(self, hass: HomeAssistant, group: WatcherGroup):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        group: WatcherGroup,
+        state_changed: Callable,
+    ) -> None:
         self.hass = hass
         self.group = group
         self.open_sensors: dict[str, OpenSensorInfo] = {}
+        self.state_changed = state_changed
 
         self._unsubscribe_state = async_track_state_change_event(
             hass, group["entities"], self._handle_state_change
@@ -119,9 +126,11 @@ class WatcherGroupProcessorBase(ABC):
                 sensor = OpenSensorInfo(entity_id=entity_id, opened_at=datetime.now())
                 self._calculate_remaining_seconds(sensor)
                 self.open_sensors[entity_id] = sensor
+                self.state_changed()
 
         elif entity_id in self.open_sensors:
             del self.open_sensors[entity_id]
+            self.state_changed()
 
     @abstractmethod
     def _get_max_open_time(self) -> timedelta:

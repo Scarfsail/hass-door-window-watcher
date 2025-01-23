@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 import logging
 
-from homeassistant.core import HomeAssistant
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 
 from ..watchers_config_store import ConfigChangeObserver, WatchersConfigStore
@@ -46,14 +46,12 @@ class WatchersProcessor(ConfigChangeObserver):
         self._get_processor_with_entity(entity_id).adjust_remaining_seconds(
             entity_id, seconds
         )
-        if self._binary_alert_sensor:
-            self._binary_alert_sensor.update_state(self.get_open_sensors())
+        self._state_changed()
 
     def dismiss_alert(self, entity_id: str) -> None:
         """Dismiss alert for an open sensor in a specific group."""
         self._get_processor_with_entity(entity_id).dismiss_alert(entity_id)
-        if self._binary_alert_sensor:
-            self._binary_alert_sensor.update_state(self.get_open_sensors())
+        self._state_changed()
 
     def _get_processor_with_entity(self, entity_id: str) -> WatcherGroupProcessorBase:
         """Find an entity by its entity_id."""
@@ -79,9 +77,13 @@ class WatchersProcessor(ConfigChangeObserver):
 
         for group in config["groups"]:
             if group["type"] == "fixed":
-                processor = WatcherGroupProcessorFixed(self._hass, group)
+                processor = WatcherGroupProcessorFixed(
+                    self._hass, group, self._state_changed
+                )
             elif group["type"] == "temperature":
-                processor = WatcherGroupProcessorTemperature(self._hass, group)
+                processor = WatcherGroupProcessorTemperature(
+                    self._hass, group, self._state_changed
+                )
             else:
                 _LOGGER.error(
                     "Unknown group type '%s' for group '%s'",
@@ -104,5 +106,10 @@ class WatchersProcessor(ConfigChangeObserver):
         for processor in self._processors:
             changed |= processor.update_open_sensors()
 
-        if changed and self._binary_alert_sensor:
+        if changed:
+            self._state_changed()
+
+    @callback
+    def _state_changed(self) -> None:
+        if self._binary_alert_sensor:
             self._binary_alert_sensor.update_state(self.get_open_sensors())
