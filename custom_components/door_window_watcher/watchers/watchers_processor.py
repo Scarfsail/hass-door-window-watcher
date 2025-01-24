@@ -74,6 +74,8 @@ class WatchersProcessor(ConfigChangeObserver):
     def _load_config(self) -> None:
         config = self._store.config
         self._dispose_processors()
+        if not config or "groups" not in config:
+            return
 
         for group in config["groups"]:
             if group["type"] == "fixed":
