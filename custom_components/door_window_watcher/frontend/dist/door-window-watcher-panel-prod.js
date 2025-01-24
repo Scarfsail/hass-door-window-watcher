@@ -22,14 +22,14 @@ let ue = class {
     return this.cssText;
   }
 };
-const me = (s) => new ue(typeof s == "string" ? s : s + "", void 0, q), F = (s, ...e) => {
+const _e = (s) => new ue(typeof s == "string" ? s : s + "", void 0, q), F = (s, ...e) => {
   const t = s.length === 1 ? s[0] : e.reduce((i, r, o) => i + ((n) => {
     if (n._$cssResult$ === !0) return n.cssText;
     if (typeof n == "number") return n;
     throw Error("Value passed to 'css' function must be a 'css' function result: " + n + ". Use 'unsafeCSS' to pass non-literal values, but take care to ensure page security.");
   })(r) + s[o + 1], s[0]);
   return new ue(t, s, q);
-}, _e = (s, e) => {
+}, me = (s, e) => {
   if (V) s.adoptedStyleSheets = e.map((t) => t instanceof CSSStyleSheet ? t : t.styleSheet);
   else for (const t of e) {
     const i = document.createElement("style"), r = k.litNonce;
@@ -38,14 +38,14 @@ const me = (s) => new ue(typeof s == "string" ? s : s + "", void 0, q), F = (s, 
 }, te = V ? (s) => s : (s) => s instanceof CSSStyleSheet ? ((e) => {
   let t = "";
   for (const i of e.cssRules) t += i.cssText;
-  return me(t);
+  return _e(t);
 })(s) : s;
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
-const { is: ye, defineProperty: Ae, getOwnPropertyDescriptor: ve, getOwnPropertyNames: be, getOwnPropertySymbols: Ee, getPrototypeOf: we } = Object, m = globalThis, se = m.trustedTypes, Se = se ? se.emptyScript : "", z = m.reactiveElementPolyfillSupport, C = (s, e) => s, R = { toAttribute(s, e) {
+const { is: ye, defineProperty: Ae, getOwnPropertyDescriptor: ve, getOwnPropertyNames: be, getOwnPropertySymbols: Ee, getPrototypeOf: we } = Object, _ = globalThis, se = _.trustedTypes, Se = se ? se.emptyScript : "", z = _.reactiveElementPolyfillSupport, C = (s, e) => s, R = { toAttribute(s, e) {
   switch (e) {
     case Boolean:
       s = s ? Se : null;
@@ -74,7 +74,7 @@ const { is: ye, defineProperty: Ae, getOwnPropertyDescriptor: ve, getOwnProperty
   }
   return t;
 } }, K = (s, e) => !ye(s, e), ie = { attribute: !0, type: String, converter: R, reflect: !1, hasChanged: K };
-Symbol.metadata ?? (Symbol.metadata = Symbol("metadata")), m.litPropertyMetadata ?? (m.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
+Symbol.metadata ?? (Symbol.metadata = Symbol("metadata")), _.litPropertyMetadata ?? (_.litPropertyMetadata = /* @__PURE__ */ new WeakMap());
 class b extends HTMLElement {
   static addInitializer(e) {
     this._$Ei(), (this.l ?? (this.l = [])).push(e);
@@ -161,7 +161,7 @@ class b extends HTMLElement {
   }
   createRenderRoot() {
     const e = this.shadowRoot ?? this.attachShadow(this.constructor.shadowRootOptions);
-    return _e(e, this.constructor.elementStyles), e;
+    return me(e, this.constructor.elementStyles), e;
   }
   connectedCallback() {
     var e;
@@ -273,14 +273,14 @@ class b extends HTMLElement {
   firstUpdated(e) {
   }
 }
-b.elementStyles = [], b.shadowRootOptions = { mode: "open" }, b[C("elementProperties")] = /* @__PURE__ */ new Map(), b[C("finalized")] = /* @__PURE__ */ new Map(), z == null || z({ ReactiveElement: b }), (m.reactiveElementVersions ?? (m.reactiveElementVersions = [])).push("2.0.4");
+b.elementStyles = [], b.shadowRootOptions = { mode: "open" }, b[C("elementProperties")] = /* @__PURE__ */ new Map(), b[C("finalized")] = /* @__PURE__ */ new Map(), z == null || z({ ReactiveElement: b }), (_.reactiveElementVersions ?? (_.reactiveElementVersions = [])).push("2.0.4");
 /**
  * @license
  * Copyright 2017 Google LLC
  * SPDX-License-Identifier: BSD-3-Clause
  */
 const x = globalThis, L = x.trustedTypes, re = L ? L.createPolicy("lit-html", { createHTML: (s) => s }) : void 0, pe = "$lit$", g = `lit$${Math.random().toFixed(9).slice(2)}$`, fe = "?" + g, Pe = `<${fe}>`, v = document, O = () => v.createComment(""), T = (s) => s === null || typeof s != "object" && typeof s != "function", Z = Array.isArray, Ce = (s) => Z(s) || typeof (s == null ? void 0 : s[Symbol.iterator]) == "function", I = `[ 	
-\f\r]`, P = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, ne = /-->/g, oe = />/g, _ = RegExp(`>|${I}(?:([^\\s"'>=/]+)(${I}*=${I}*(?:[^ 	
+\f\r]`, P = /<(?:(!--|\/[^a-zA-Z])|(\/?[a-zA-Z][^>\s]*)|(\/?$))/g, ne = /-->/g, oe = />/g, m = RegExp(`>|${I}(?:([^\\s"'>=/]+)(${I}*=${I}*(?:[^ 	
 \f\r"'\`<>=]|("|')|))|$)`, "g"), ae = /'/g, he = /"/g, $e = /^(?:script|style|textarea|title)$/i, xe = (s) => (e, ...t) => ({ _$litType$: s, strings: e, values: t }), p = xe(1), E = Symbol.for("lit-noChange"), d = Symbol.for("lit-nothing"), le = /* @__PURE__ */ new WeakMap(), y = v.createTreeWalker(v, 129);
 function ge(s, e) {
   if (!Z(s) || !s.hasOwnProperty("raw")) throw Error("invalid template strings array");
@@ -292,8 +292,8 @@ const Oe = (s, e) => {
   for (let h = 0; h < t; h++) {
     const a = s[h];
     let c, u, l = -1, f = 0;
-    for (; f < a.length && (n.lastIndex = f, u = n.exec(a), u !== null); ) f = n.lastIndex, n === P ? u[1] === "!--" ? n = ne : u[1] !== void 0 ? n = oe : u[2] !== void 0 ? ($e.test(u[2]) && (r = RegExp("</" + u[2], "g")), n = _) : u[3] !== void 0 && (n = _) : n === _ ? u[0] === ">" ? (n = r ?? P, l = -1) : u[1] === void 0 ? l = -2 : (l = n.lastIndex - u[2].length, c = u[1], n = u[3] === void 0 ? _ : u[3] === '"' ? he : ae) : n === he || n === ae ? n = _ : n === ne || n === oe ? n = P : (n = _, r = void 0);
-    const $ = n === _ && s[h + 1].startsWith("/>") ? " " : "";
+    for (; f < a.length && (n.lastIndex = f, u = n.exec(a), u !== null); ) f = n.lastIndex, n === P ? u[1] === "!--" ? n = ne : u[1] !== void 0 ? n = oe : u[2] !== void 0 ? ($e.test(u[2]) && (r = RegExp("</" + u[2], "g")), n = m) : u[3] !== void 0 && (n = m) : n === m ? u[0] === ">" ? (n = r ?? P, l = -1) : u[1] === void 0 ? l = -2 : (l = n.lastIndex - u[2].length, c = u[1], n = u[3] === void 0 ? m : u[3] === '"' ? he : ae) : n === he || n === ae ? n = m : n === ne || n === oe ? n = P : (n = m, r = void 0);
+    const $ = n === m && s[h + 1].startsWith("/>") ? " " : "";
     o += n === P ? a + Pe : l >= 0 ? (i.push(c), a.slice(0, l) + pe + a.slice(l) + g + $) : a + g + (l === -2 ? h : $);
   }
   return [ge(s, o + (s[t] || "<?>") + (e === 2 ? "</svg>" : e === 3 ? "</math>" : "")), i];
@@ -697,6 +697,7 @@ let H = class extends A {
                         .itemValuePath=${"value"}
                         @value-changed=${(e) => this.groupParamChanged("type", e.detail.value)}>
                     </ha-combo-box>
+                    <ha-textfield .label=${"Sensor's open state"} .value=${this.group.sensor_open_state} @change=${(e) => this.groupParamChanged("sensor_open_state", e.target.value)}></ha-textfield>
                     ${this.group.type == "fixed" ? this.renderParamsFixed(this.group) : this.renderParamsTemperature(this.group)}
                     <h3>Door / Windows:</h3>
                     ${this.group.entities.map((e, t) => p`
@@ -714,17 +715,16 @@ let H = class extends A {
   }
   renderParamsFixed(s) {
     return p`
-            <ha-textfield .label=${"Max duration"} .value=${s.maxDurationSeconds} @change=${(e) => this.groupParamChanged("maxDurationSeconds", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Max duration (sec)"} .value=${s.maxDurationSeconds} @change=${(e) => this.groupParamChanged("maxDurationSeconds", e.target.value)}></ha-textfield>
         `;
   }
   renderParamsTemperature(s) {
     return p`
-            <ha-entity-picker .hass=${this.hass} required .value=${s.indoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select indoor temperature sensor" @value-changed=${(e) => this.groupParamChanged("indoorTemperaureEntity", e.detail.value)}></ha-entity-picker> 
-            <ha-entity-picker .hass=${this.hass} required .value=${s.outdoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select outdoor temperature sensor" @value-changed=${(e) => this.groupParamChanged("outdoorTemperaureEntity", e.detail.value)}></ha-entity-picker> 
-
-            <ha-textfield .label=${"Temperature difference"} .value=${s.temperatureDiff} @change=${(e) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
-            <ha-textfield .label=${"Time difference"} .value=${s.timeDiff} @change=${(e) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
-            <ha-textfield .label=${"Max temperature"} .value=${s.maxTemperture} @change=${(e) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>
+            <ha-entity-picker .hass=${this.hass} required .value=${s.indoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select indoor temperature sensor" @value-changed=${(e) => this.groupParamChanged("indoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
+            <ha-entity-picker .hass=${this.hass} required .value=${s.outdoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select outdoor temperature sensor" @value-changed=${(e) => this.groupParamChanged("outdoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
+            <ha-textfield .label=${"Temperature difference (°C)"} .value=${s.temperatureDiff} @change=${(e) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Time difference (sec)"} .value=${s.timeDiff} @change=${(e) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Max temperature (°C)"} .value=${s.maxTemperture} @change=${(e) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>
         `;
   }
   groupParamChanged(s, e) {
@@ -791,7 +791,7 @@ let j = class extends A {
   }
   addGroup() {
     const s = [...this.groups];
-    s.push({ type: "fixed", title: "New group", entities: [], maxDurationSeconds: 60 }), this.fireGroupsChanged(s);
+    s.push({ type: "fixed", title: "New group", entities: [], maxDurationSeconds: 60, sensor_open_state: "on" }), this.fireGroupsChanged(s);
   }
   groupChanged(s, e) {
     const t = [...this.groups];

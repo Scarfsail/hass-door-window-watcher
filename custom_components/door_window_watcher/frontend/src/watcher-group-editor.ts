@@ -62,16 +62,16 @@ export class WatcherGroupEditor extends LitElement {
     }
     private renderParamsFixed(group: WatcherGroupFixed) {
         return html`
-            <ha-textfield .label=${"Max duration"} .value=${group.maxDurationSeconds} @change=${(e: any) => this.groupParamChanged("maxDurationSeconds", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Max duration (sec)"} .value=${group.maxDurationSeconds} @change=${(e: any) => this.groupParamChanged("maxDurationSeconds", e.target.value)}></ha-textfield>
         `
     }
     private renderParamsTemperature(group: WatcherGroupTemperature) {
         return html`
             <ha-entity-picker .hass=${this.hass} required .value=${group.indoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select indoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("indoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
             <ha-entity-picker .hass=${this.hass} required .value=${group.outdoorTemperatureEntity} .includeDomains=${["sensor"]} label="Select outdoor temperature sensor" @value-changed=${(e: CustomEvent) => this.groupParamChanged("outdoorTemperatureEntity", e.detail.value)}></ha-entity-picker> 
-            <ha-textfield .label=${"Temperature difference"} .value=${group.temperatureDiff} @change=${(e: any) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
-            <ha-textfield .label=${"Time difference"} .value=${group.timeDiff} @change=${(e: any) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
-            <ha-textfield .label=${"Max temperature"} .value=${group.maxTemperture} @change=${(e: any) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Temperature difference (°C)"} .value=${group.temperatureDiff} @change=${(e: any) => this.groupParamChanged("temperatureDiff", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Time difference (sec)"} .value=${group.timeDiff} @change=${(e: any) => this.groupParamChanged("timeDiff", e.target.value)}></ha-textfield>
+            <ha-textfield .label=${"Max temperature (°C)"} .value=${group.maxTemperture} @change=${(e: any) => this.groupParamChanged("maxTemperture", e.target.value)}></ha-textfield>
         `
     }
     private groupParamChanged(param: keyof WatcherGroupTemperature | keyof WatcherGroupFixed, value: any) {
