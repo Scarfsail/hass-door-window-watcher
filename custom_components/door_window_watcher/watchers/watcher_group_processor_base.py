@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import attr
 from sqlalchemy import Boolean
@@ -64,7 +64,7 @@ class WatcherGroupProcessorBase(ABC):
 
         if sensor.remaining_seconds == 0:
             # When remaining time is zero, calculate time since alert was triggered
-            elapsed = datetime.now() - sensor.opened_at
+            elapsed = datetime.now(UTC) - sensor.opened_at
             time_since_alert = elapsed.total_seconds() - max_time.total_seconds()
             sensor.adjusted_seconds = int(time_since_alert + seconds)
         else:
@@ -79,6 +79,9 @@ class WatcherGroupProcessorBase(ABC):
             return
 
         sensor = self.open_sensors[entity_id]
+
+        sensor.adjusted_seconds = sensor.remaining_seconds * -1
+        sensor.remaining_seconds = 0
         sensor.alert_triggered = False
 
     def _calculate_remaining_seconds(self, sensor: OpenSensorInfo) -> Boolean:
@@ -90,7 +93,7 @@ class WatcherGroupProcessorBase(ABC):
             sensor.remaining_seconds = 0
             sensor.alert_triggered = False
         else:
-            elapsed = datetime.now() - sensor.opened_at
+            elapsed = datetime.now(UTC) - sensor.opened_at
             remaining = (
                 max_time.total_seconds()
                 - elapsed.total_seconds()
@@ -123,7 +126,10 @@ class WatcherGroupProcessorBase(ABC):
 
         if new_state.state == self.group["sensor_open_state"]:
             if entity_id not in self.open_sensors:
-                sensor = OpenSensorInfo(entity_id=entity_id, opened_at=datetime.now())
+                sensor = OpenSensorInfo(
+                    entity_id=entity_id, opened_at=datetime.now(UTC)
+                )
+
                 self._calculate_remaining_seconds(sensor)
                 self.open_sensors[entity_id] = sensor
                 self.state_changed()
