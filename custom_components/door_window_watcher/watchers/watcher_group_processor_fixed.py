@@ -14,5 +14,5 @@ class WatcherGroupProcessorFixed(WatcherGroupProcessorBase):
         super().__init__(hass, group, state_changed)
         self._group: WatcherGroupFixed = group
 
-    def _get_max_open_time(self) -> timedelta:
-        return timedelta(seconds=self._group["maxDurationSeconds"])
+    def _get_max_open_time_seconds(self) -> timedelta:
+        return int(self._group["maxDurationSeconds"])

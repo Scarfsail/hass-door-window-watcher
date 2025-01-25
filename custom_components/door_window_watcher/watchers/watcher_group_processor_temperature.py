@@ -25,7 +25,7 @@ class WatcherGroupProcessorTemperature(WatcherGroupProcessorBase):
 
         return float(state.state) if state.state != "unavailable" else None
 
-    def _get_max_open_time(self) -> timedelta | None:
+    def _get_max_open_time_seconds(self) -> timedelta | None:
         outdoor_temp = self._get_entity_state("outdoorTemperatureEntity")
         indoor_temp = self._get_entity_state("indoorTemperatureEntity")
 
@@ -42,4 +42,4 @@ class WatcherGroupProcessorTemperature(WatcherGroupProcessorBase):
         set_temp_diff = float(self._group["temperatureDiff"])
         time_diff = float(self._group["timeDiff"])
         ratio = set_temp_diff / temp_diff
-        return timedelta(seconds=int(time_diff * ratio))
+        return int(time_diff * ratio)

@@ -60,12 +60,12 @@ class WatcherGroupProcessorBase(ABC):
             return
 
         sensor = self.open_sensors[entity_id]
-        max_time = self._get_max_open_time()
+        max_time_seconds = self._get_max_open_time_seconds()
 
         if sensor.remaining_seconds == 0:
             # When remaining time is zero, calculate time since alert was triggered
             elapsed = datetime.now(UTC) - sensor.opened_at
-            time_since_alert = elapsed.total_seconds() - max_time.total_seconds()
+            time_since_alert = elapsed.total_seconds() - max_time_seconds
             sensor.adjusted_seconds = int(time_since_alert + seconds)
         else:
             # When there's remaining time, simply add to adjusted_seconds
@@ -87,17 +87,15 @@ class WatcherGroupProcessorBase(ABC):
     def _calculate_remaining_seconds(self, sensor: OpenSensorInfo) -> Boolean:
         prev_remaining_seconds = sensor.remaining_seconds
 
-        max_time = self._get_max_open_time()
+        max_time_seconds = self._get_max_open_time_seconds()
 
-        if max_time == 0 and sensor.adjusted_seconds == 0:
+        if max_time_seconds == 0 and sensor.adjusted_seconds == 0:
             sensor.remaining_seconds = 0
             sensor.alert_triggered = False
         else:
             elapsed = datetime.now(UTC) - sensor.opened_at
             remaining = (
-                max_time.total_seconds()
-                - elapsed.total_seconds()
-                + sensor.adjusted_seconds
+                max_time_seconds - elapsed.total_seconds() + sensor.adjusted_seconds
             )
             sensor.remaining_seconds = max(0, int(remaining))
 
@@ -139,5 +137,5 @@ class WatcherGroupProcessorBase(ABC):
             self.state_changed()
 
     @abstractmethod
-    def _get_max_open_time(self) -> timedelta:
+    def _get_max_open_time_seconds(self) -> int:
         """Get the duration before an alert should be triggered."""
