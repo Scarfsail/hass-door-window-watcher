@@ -18,6 +18,7 @@ class OpenSensorInfo:
     remaining_seconds: int = attr.ib(default=0)
     adjusted_seconds: int = attr.ib(default=0)
     alert_triggered: bool = attr.ib(default=False)
+    dismissed: bool = attr.ib(default=False)
 
 
 class WatcherGroupProcessorBase(ABC):
@@ -60,6 +61,7 @@ class WatcherGroupProcessorBase(ABC):
             return
 
         sensor = self.open_sensors[entity_id]
+        sensor.dismissed = False
         max_time_seconds = self._get_max_open_time_seconds()
 
         if sensor.remaining_seconds == 0:
@@ -80,7 +82,7 @@ class WatcherGroupProcessorBase(ABC):
 
         sensor = self.open_sensors[entity_id]
 
-        sensor.adjusted_seconds = sensor.remaining_seconds * -1
+        sensor.dismissed = True
         sensor.remaining_seconds = 0
         sensor.alert_triggered = False
 
@@ -89,7 +91,7 @@ class WatcherGroupProcessorBase(ABC):
 
         max_time_seconds = self._get_max_open_time_seconds()
 
-        if max_time_seconds == 0 and sensor.adjusted_seconds == 0:
+        if sensor.dismissed or (max_time_seconds == 0 and sensor.adjusted_seconds == 0):
             sensor.remaining_seconds = 0
             sensor.alert_triggered = False
         else:
