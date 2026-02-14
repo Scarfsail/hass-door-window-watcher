@@ -6,7 +6,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.event import async_track_time_interval
 
 from ..watchers_config_store import ConfigChangeObserver, WatchersConfigStore
-from .watcher_group_processor_base import OpenSensorInfo, WatcherGroupProcessorBase
+from .watcher_group_processor_base import OpenSensorInfo, SensorInfo, WatcherGroupProcessorBase
 from .watcher_group_processor_fixed import WatcherGroupProcessorFixed
 from .watcher_group_processor_temperature import WatcherGroupProcessorTemperature
 
@@ -36,6 +36,13 @@ class WatchersProcessor(ConfigChangeObserver):
         for processor in self._processors:
             open_sensors.extend(processor.get_open_sensors(only_alerts))
         return open_sensors
+
+    def get_all_sensors(self, only_open: bool = False) -> list[SensorInfo]:
+        """Get all configured sensors across all groups."""
+        all_sensors: list[SensorInfo] = []
+        for processor in self._processors:
+            all_sensors.extend(processor.get_all_sensors(only_open))
+        return all_sensors
 
     def register_binary_alert_sensor(self, sensor: WatchersAlertSensorBase) -> None:
         self._binary_alert_sensor = sensor

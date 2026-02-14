@@ -21,6 +21,20 @@ class OpenSensorInfo:
     dismissed: bool = attr.ib(default=False)
 
 
+@attr.s(slots=True)
+class SensorInfo:
+    """Sensor info for all configured sensors (open and closed)."""
+
+    entity_id: str = attr.ib()
+    state: str = attr.ib()
+    last_changed: str = attr.ib()
+    opened_at: str | None = attr.ib(default=None)
+    remaining_seconds: int = attr.ib(default=0)
+    adjusted_seconds: int = attr.ib(default=0)
+    alert_triggered: bool = attr.ib(default=False)
+    dismissed: bool = attr.ib(default=False)
+
+
 class WatcherGroupProcessorBase(ABC):
     def __init__(
         self,
@@ -46,6 +60,42 @@ class WatcherGroupProcessorBase(ABC):
         """Get all open sensors."""
         sensors = self.open_sensors.values()
         return filter(lambda x: x.alert_triggered, sensors) if only_alerts else sensors
+
+    def get_all_sensors(self, only_open: bool = False) -> list[SensorInfo]:
+        """Get all configured sensors with their current state."""
+        sensors: list[SensorInfo] = []
+        for entity_id in self.group["entities"]:
+            state_obj = self.hass.states.get(entity_id)
+            if not state_obj:
+                continue
+
+            is_open = entity_id in self.open_sensors
+
+            if only_open and not is_open:
+                continue
+
+            if is_open:
+                open_info = self.open_sensors[entity_id]
+                sensor = SensorInfo(
+                    entity_id=entity_id,
+                    state=self.group["sensor_open_state"],
+                    last_changed=state_obj.last_changed.isoformat(),
+                    opened_at=open_info.opened_at.isoformat(),
+                    remaining_seconds=open_info.remaining_seconds,
+                    adjusted_seconds=open_info.adjusted_seconds,
+                    alert_triggered=open_info.alert_triggered,
+                    dismissed=open_info.dismissed,
+                )
+            else:
+                sensor = SensorInfo(
+                    entity_id=entity_id,
+                    state=state_obj.state,
+                    last_changed=state_obj.last_changed.isoformat(),
+                )
+
+            sensors.append(sensor)
+
+        return sensors
 
     def update_open_sensors(self) -> Boolean:
         """Update remaining time for open sensors."""

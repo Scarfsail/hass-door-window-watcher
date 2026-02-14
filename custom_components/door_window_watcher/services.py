@@ -21,6 +21,13 @@ def register_services(hass: HomeAssistant):
         serialized = {"open_sensors:": [attr.asdict(sensor) for sensor in sensors]}
         return serialized
 
+    def get_sensors(call):
+        """Handle the get_sensors service call."""
+        only_open = call.data.get("only_open", False)
+        processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
+        sensors = processor.get_all_sensors(only_open)
+        return {"sensors": [attr.asdict(sensor) for sensor in sensors]}
+
     def adjust_remaining_seconds(call):
         """Handle the service call."""
         processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
@@ -47,6 +54,14 @@ def register_services(hass: HomeAssistant):
         "get_open_sensors",
         get_open_sensors,
         schema=vol.Schema({vol.Optional("only_alerts"): cv.boolean}),
+        supports_response=SupportsResponse.ONLY,
+    )
+
+    hass.services.async_register(
+        DOMAIN,
+        "get_sensors",
+        get_sensors,
+        schema=vol.Schema({vol.Optional("only_open"): cv.boolean}),
         supports_response=SupportsResponse.ONLY,
     )
 
