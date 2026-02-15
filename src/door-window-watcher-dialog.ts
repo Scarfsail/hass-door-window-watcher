@@ -349,16 +349,16 @@ export class DoorWindowWatcherDialog extends LitElement {
                             </span>
                         ` : html`<span class="remaining-time"></span>`}
                         <ha-button
-                            size="small"
-                            appearance="outlined"
+                            .size=${'small'}
+                            .appearance=${'outlined'}
                             @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}
                         >
                             <ha-icon slot="start" icon="mdi:plus"></ha-icon>
                             ${localize('dialog.add_5_min')}
                         </ha-button>
                         <ha-button
-                            size="small"
-                            appearance="outlined"
+                            .size=${'small'}
+                            .appearance=${'outlined'}
                             .disabled=${sensor.remaining_seconds <= 0}
                             @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}
                         >
@@ -366,8 +366,8 @@ export class DoorWindowWatcherDialog extends LitElement {
                             ${localize('dialog.sub_5_min')}
                         </ha-button>
                         <ha-button
-                            size="small"
-                            appearance="outlined"
+                            .size=${'small'}
+                            .appearance=${'outlined'}
                             .disabled=${!showDismiss}
                             @click=${(e: Event) => { e.stopPropagation(); this.callService("dismiss_alert", {}, sensor.entity_id); }}
                         >

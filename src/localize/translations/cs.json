@@ -7,7 +7,7 @@
   },
   "dialog": {
     "title": "Hlídač Dveří a Oken",
-    "no_sensors": "Žádné senzory nenalezeny",
+    "no_sensors": "Všechny dveře nebo okna jsou zavřené.",
     "show_also_closed": "Zobrazit i zavřené …",
     "show_only_open": "Zobrazit pouze otevřené",
     "add_5_min": "5 m",
