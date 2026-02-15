@@ -5,6 +5,7 @@ import type { LovelaceCard } from "../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../hass-frontend/src/data/lovelace/config/card";
 import { OpenSensorInfo } from "./models";
 import { classMap } from "lit/directives/class-map.js";
+import { getLocalizeFunction } from "./localize";
 import "./door-window-watcher-dialog";
 import type { DoorWindowWatcherDialogParams } from "./door-window-watcher-dialog";
 
@@ -60,12 +61,14 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
     `
 
     render() {
+        const localize = getLocalizeFunction(this._hass!);
+
         if (!this.config) {
-            return "Config is not defined";
+            return localize('card.no_config');
         }
         const entity = this._hass?.states[this.config.entity];
         if (!entity) {
-            return `Entity ${this.config.entity} not found`;
+            return localize('card.entity_not_found', { entity: this.config.entity });
         }
 
         const open_sensors = entity.attributes.open_sensors as OpenSensorInfo[];
@@ -112,7 +115,7 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
 (window as any).customCards = (window as any).customCards || [];
 (window as any).customCards.push({
     type: 'door-window-watcher-card',
-    name: 'Door Window Watcher Card',
-    description: 'Card for Door Window Watcher Integration',
+    name: 'Door Window Watcher Card', // This is shown in card picker UI
+    description: 'Card for Door Window Watcher Integration', // This is shown in card picker UI
     preview: true,
 });

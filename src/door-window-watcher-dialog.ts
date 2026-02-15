@@ -7,6 +7,7 @@ import duration from 'dayjs/plugin/duration'
 import { getDurationMmSs } from "./time_utils";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from 'lit/directives/keyed.js';
+import { getLocalizeFunction } from "./localize";
 
 dayjs.extend(duration);
 
@@ -188,24 +189,25 @@ export class DoorWindowWatcherDialog extends LitElement {
     render() {
         if (!this._params) return nothing;
 
+        const localize = getLocalizeFunction(this.hass);
         const sortedSensors = this.sortAllSensors(this.getSensorsToDisplay());
 
         return html`
             <ha-dialog
                 open
                 @closed=${this.closeDialog}
-                .heading=${"Door and Window Watcher"}
+                .heading=${localize('dialog.title')}
             >
                 <div>
                     <div class="dialog-filter">
-                        <label>Only open</label>
+                        <label>${localize('dialog.only_open')}</label>
                         <ha-switch
                             .checked=${this.onlyOpen}
                             @change=${this.toggleOnlyOpen}
                         ></ha-switch>
                     </div>
                     ${sortedSensors.length === 0
-                        ? html`<p style="opacity: 0.6; text-align: center; padding: 16px;">No sensors found</p>`
+                        ? html`<p style="opacity: 0.6; text-align: center; padding: 16px;">${localize('dialog.no_sensors')}</p>`
                         : sortedSensors.map(sensor => keyed(sensor.entity_id, this.renderDialogSensor(sensor)))
                     }
                 </div>
@@ -214,6 +216,7 @@ export class DoorWindowWatcherDialog extends LitElement {
     }
 
     private renderDialogSensor(sensor: SensorInfo) {
+        const localize = getLocalizeFunction(this.hass);
         const haState = this.hass?.states[sensor.entity_id];
         const isOpen = sensor.opened_at !== null;
         const color_class = {
@@ -252,9 +255,9 @@ export class DoorWindowWatcherDialog extends LitElement {
                             : ""}
                         <span>${getDurationMmSs(dayjs().subtract(sensor.remaining_seconds, "second"))}</span>
                     </span>
-                    <ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}>+5 m</ha-button>
+                    <ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}>${localize('dialog.add_5_min')}</ha-button>
                     ${sensor.remaining_seconds > 0
-                        ? html`<ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}>-5 m</ha-button>`
+                        ? html`<ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}>${localize('dialog.sub_5_min')}</ha-button>`
                         : ""}
                     ${sensor.remaining_seconds > 0 || sensor.alert_triggered
                         ? html`<ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("dismiss_alert", {}, sensor.entity_id); }}><ha-icon icon="mdi:close"></ha-icon></ha-button>`
@@ -265,6 +268,7 @@ export class DoorWindowWatcherDialog extends LitElement {
     }
 
     private formatLastChanged(isoDate: string): string {
+        const localize = getLocalizeFunction(this.hass);
         const diff = dayjs().diff(dayjs(isoDate));
         const dur = dayjs.duration(diff);
         const hours = Math.floor(dur.asHours());
@@ -272,12 +276,12 @@ export class DoorWindowWatcherDialog extends LitElement {
 
         if (hours > 24) {
             const days = Math.floor(hours / 24);
-            return `${days}d ago`;
+            return localize('time.days_ago', { days: days.toString() });
         }
         if (hours > 0) {
-            return `${hours}h ${minutes}m ago`;
+            return localize('time.hours_minutes_ago', { hours: hours.toString(), minutes: minutes.toString() });
         }
-        return `${minutes}m ago`;
+        return localize('time.minutes_ago', { minutes: minutes.toString() });
     }
 
     private async callService(service: string, data: any, entity_id: string) {

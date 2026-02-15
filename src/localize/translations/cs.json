@@ -1,0 +1,20 @@
+{
+  "card": {
+    "no_config": "Konfigurace není definována",
+    "entity_not_found": "Entita {entity} nebyla nalezena",
+    "name": "Karta Hlídače Dveří a Oken",
+    "description": "Karta pro integraci Hlídače Dveří a Oken"
+  },
+  "dialog": {
+    "title": "Hlídač Dveří a Oken",
+    "only_open": "Pouze otevřené",
+    "no_sensors": "Žádné senzory nenalezeny",
+    "add_5_min": "+5 m",
+    "sub_5_min": "-5 m"
+  },
+  "time": {
+    "days_ago": "{days}d nazpět",
+    "hours_minutes_ago": "{hours}h {minutes}m nazpět",
+    "minutes_ago": "{minutes}m nazpět"
+  }
+}
