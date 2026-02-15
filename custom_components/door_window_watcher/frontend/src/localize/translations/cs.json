@@ -1,0 +1,30 @@
+{
+  "panel": {
+    "no_config": "Žádná konfigurace",
+    "header": "Hlídač dveří a oken",
+    "groups": "Skupiny",
+    "save": "Uložit"
+  },
+  "groups": {
+    "no_groups": "Žádné skupiny",
+    "add_group": "Přidat skupinu",
+    "new_group": "Nová skupina",
+    "no_group": "Žádná skupina"
+  },
+  "editor": {
+    "parameters": "Parametry:",
+    "watch_time_based_on": "Čas hlídání podle",
+    "fixed_time": "Pevný čas",
+    "temperature_based": "Vnitřní a venkovní teplota",
+    "sensor_open_state": "Stav otevření senzoru",
+    "door_windows": "Dveře / Okna:",
+    "enter_new_title": "Zadejte nový název",
+    "max_duration_sec": "Maximální doba (sec)",
+    "select_indoor_temp": "Vyberte senzor vnitřní teploty",
+    "select_outdoor_temp": "Vyberte senzor venkovní teploty",
+    "temperature_diff": "Rozdíl teplot (°C)",
+    "time_diff": "Časový rozdíl (sec)",
+    "max_temperature": "Maximální teplota (°C)",
+    "select_door_window": "Vyberte dveře nebo okno"
+  }
+}

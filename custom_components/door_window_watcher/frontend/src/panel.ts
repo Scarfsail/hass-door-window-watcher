@@ -2,6 +2,7 @@ import { LitElement, html, CSSResultGroup, css } from 'lit';
 import { property, customElement, state } from 'lit/decorators.js';
 import { HomeAssistant, WatcherGroup } from './types';
 import { loadHaForm } from "./load-ha-elements";
+import { getLocalizeFunction, LocalizeFunction } from './localize';
 
 import './watcher-group-editor';
 import './watcher-groups-editor';
@@ -26,19 +27,21 @@ export class DoorWindowWatcherPanel extends LitElement {
     }
   `
   render() {
+    const localize = getLocalizeFunction(this.hass);
+
     if (!this.config)
-      return html`<div>No config</div>`
+      return html`<div>${localize('panel.no_config')}</div>`
 
     return html`
-      <ha-card header="Door Window Watcher Panel">
-      <div class="card-content">        
-        <div>Groups</div>
+      <ha-card header="${localize('panel.header')}">
+      <div class="card-content">
+        <div>${localize('panel.groups')}</div>
         <watcher-groups-editor .hass=${this.hass} .groups=${this.config.groups} @groups-changed=${(e: CustomEvent) => this.config = { ...this.config, groups: e.detail.groups }}></watcher-groups-editor>
         <div>
         <div class="right">
-          <ha-button @click="${this.saveConfig}">Save</ha-button>
+          <ha-button @click="${this.saveConfig}">${localize('panel.save')}</ha-button>
         </div>
-      </div>        
+      </div>
       </div>
     </ha-card>
     `
