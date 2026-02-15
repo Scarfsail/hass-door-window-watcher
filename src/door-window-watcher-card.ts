@@ -16,6 +16,7 @@ interface DoorWindowWatcherCardConfig extends LovelaceCardConfig {
 export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
 
     private config?: DoorWindowWatcherCardConfig;
+    private dialogOpen = false;
     @state() private _hass?: HomeAssistant;
 
     public set hass(value: HomeAssistant) {
@@ -23,7 +24,7 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
         const entity_new = this.config ? value?.states[this.config.entity] : undefined;
         if (entity_new) {
             if (entity_old?.state != entity_new.state) {
-                if (entity_new.state == "on") {
+                if (entity_new.state == "on" && !this.dialogOpen) {
                     this.openDialog();
                 }
             }
@@ -84,7 +85,9 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
     }
 
     private openDialog() {
-        if (!this._hass) return;
+        if (!this._hass || this.dialogOpen || !this.config) return;
+
+        this.dialogOpen = true;
 
         this.dispatchEvent(new CustomEvent("show-dialog", {
             bubbles: true,
@@ -93,10 +96,16 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
                 dialogTag: "door-window-watcher-dialog",
                 dialogImport: () => Promise.resolve(),
                 dialogParams: {
-                    hass: this._hass,
+                    entityId: this.config.entity,
                 } as DoorWindowWatcherDialogParams,
             },
         }));
+
+        window.addEventListener("dialog-closed", (ev: Event) => {
+            if ((ev as CustomEvent).detail?.dialog === "door-window-watcher-dialog") {
+                this.dialogOpen = false;
+            }
+        }, { once: true });
     }
 }
 

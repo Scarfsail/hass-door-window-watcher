@@ -1,5 +1,5 @@
 import { LitElement, css, html, nothing } from "lit-element"
-import { customElement, state } from "lit/decorators.js";
+import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../hass-frontend/src/types";
 import { SensorInfo } from "./models";
 import dayjs from "dayjs";
@@ -11,57 +11,54 @@ import { keyed } from 'lit/directives/keyed.js';
 dayjs.extend(duration);
 
 export interface DoorWindowWatcherDialogParams {
-    hass: HomeAssistant;
+    entityId: string;
 }
 
 @customElement("door-window-watcher-dialog")
 export class DoorWindowWatcherDialog extends LitElement {
 
-    @state() private _hass?: HomeAssistant;
+    @property({ attribute: false }) public hass!: HomeAssistant;
     @state() private _params?: DoorWindowWatcherDialogParams;
     @state() private onlyOpen = true;
-    @state() private allSensors: SensorInfo[] = [];
+    @state() private monitoredEntityIds: string[] = [];
 
     public showDialog(params: DoorWindowWatcherDialogParams): void {
         this._params = params;
-        this._hass = params.hass;
-        this.fetchSensors();
     }
 
     public closeDialog(): void {
         this._params = undefined;
-    }
-
-    private async fetchSensors() {
-        if (!this._hass) return;
-
-        try {
-            const response = await this._hass.callService(
-                "door_window_watcher",
-                "get_sensors",
-                { only_open: this.onlyOpen },
-                undefined,
-                false,
-                true,
-            );
-            this.allSensors = response?.response?.sensors ?? [];
-        } catch (e) {
-            console.error("Failed to fetch sensors", e);
-        }
+        this.dispatchEvent(new CustomEvent("dialog-closed", {
+            bubbles: true,
+            composed: true,
+            detail: { dialog: "door-window-watcher-dialog" },
+        }));
     }
 
     private async toggleOnlyOpen() {
         this.onlyOpen = !this.onlyOpen;
-        await this.fetchSensors();
+        if (!this.onlyOpen && this.monitoredEntityIds.length === 0) {
+            await this.fetchMonitoredEntityIds();
+        }
     }
 
-    private openMoreInfo(entity_id: string) {
-        const event = new CustomEvent('hass-more-info', {
-            bubbles: true,
-            composed: true,
-            detail: { entityId: entity_id },
-        });
-        this.dispatchEvent(event);
+    private async fetchMonitoredEntityIds() {
+        if (!this.hass) return;
+
+        try {
+            const response = await this.hass.callService(
+                "door_window_watcher",
+                "get_sensors",
+                { only_open: false },
+                undefined,
+                false,
+                true,
+            );
+            const allSensors = (response?.response?.sensors ?? []) as SensorInfo[];
+            this.monitoredEntityIds = allSensors.map(s => s.entity_id);
+        } catch (e) {
+            console.error("Failed to fetch monitored entity IDs", e);
+        }
     }
 
     private sortAllSensors(sensors: SensorInfo[]): SensorInfo[] {
@@ -135,10 +132,63 @@ export class DoorWindowWatcherDialog extends LitElement {
         }
     `
 
+    private openMoreInfo(entity_id: string) {
+        const event = new CustomEvent('hass-more-info', {
+            bubbles: true,
+            composed: true,
+            detail: { entityId: entity_id },
+        });
+        this.dispatchEvent(event);
+    }
+
+    private getSensorsToDisplay(): SensorInfo[] {
+        if (!this._params || !this.hass) return [];
+
+        const entity = this.hass.states[this._params.entityId];
+        if (!entity) return [];
+
+        // Always get current open sensors from attributes
+        const openSensors = (entity.attributes.open_sensors || []) as any[];
+        const openSensorMap = new Map(
+            openSensors.map(s => [s.entity_id, s])
+        );
+
+        if (this.onlyOpen) {
+            // Show only open sensors
+            return openSensors.map(s => ({
+                entity_id: s.entity_id,
+                state: this.hass.states[s.entity_id]?.state || "on",
+                last_changed: this.hass.states[s.entity_id]?.last_changed || "",
+                opened_at: s.opened_at,
+                remaining_seconds: s.remaining_seconds,
+                adjusted_seconds: s.adjusted_seconds,
+                alert_triggered: s.alert_triggered,
+                dismissed: false,
+            }));
+        }
+
+        // Show all monitored sensors - get state from attributes and hass.states
+        return this.monitoredEntityIds.map(entityId => {
+            const entityState = this.hass.states[entityId];
+            const openInfo = openSensorMap.get(entityId);
+            
+            return {
+                entity_id: entityId,
+                state: entityState?.state || "unknown",
+                last_changed: entityState?.last_changed || "",
+                opened_at: openInfo?.opened_at || null,
+                remaining_seconds: openInfo?.remaining_seconds || 0,
+                adjusted_seconds: openInfo?.adjusted_seconds || 0,
+                alert_triggered: openInfo?.alert_triggered || false,
+                dismissed: false,
+            };
+        }).filter(s => this.hass.states[s.entity_id]); // Only include entities that exist
+    }
+
     render() {
         if (!this._params) return nothing;
 
-        const sortedSensors = this.sortAllSensors(this.allSensors);
+        const sortedSensors = this.sortAllSensors(this.getSensorsToDisplay());
 
         return html`
             <ha-dialog
@@ -164,7 +214,7 @@ export class DoorWindowWatcherDialog extends LitElement {
     }
 
     private renderDialogSensor(sensor: SensorInfo) {
-        const haState = this._hass?.states[sensor.entity_id];
+        const haState = this.hass?.states[sensor.entity_id];
         const isOpen = sensor.opened_at !== null;
         const color_class = {
             "alert-active": sensor.alert_triggered,
@@ -230,9 +280,9 @@ export class DoorWindowWatcherDialog extends LitElement {
         return `${minutes}m ago`;
     }
 
-    private callService(service: string, data: any, entity_id: string) {
-        if (!this._hass) return;
+    private async callService(service: string, data: any, entity_id: string) {
+        if (!this.hass) return;
         data = { ...data, ...{ entity_id: entity_id } };
-        this._hass.callService("door_window_watcher", service, data);
+        await this.hass.callService("door_window_watcher", service, data);
     }
 }
