@@ -85,33 +85,132 @@ export class DoorWindowWatcherDialog extends LitElement {
     }
 
     static styles = css`
-        .alert-active { color: var(--error-color) }
-        .countdown-active { color: var(--warning-color) }
-        .inactive { color: var(--primary-text-color) }
-        .sensor-card {
-            margin: 5px;
-            padding: 5px;
-            padding-left: 10px;
-        }
-        .sensor-title {
-            font-size: 16px;
-            font-weight: bold;
-            display: flex;
-            align-items: center;
+        .toggle-link {
+            display: block;
+            text-align: center;
+            padding: 12px;
+            color: var(--primary-color);
+            font-size: 14px;
             cursor: pointer;
+            user-select: none;
         }
-        .sensor-title:hover {
+        .toggle-link:hover {
             opacity: 0.8;
         }
-        .elapsed-time {
-            opacity: 0.6;
-            margin-left: 10px;
-            font-size: 12px;
+
+        /* Sensor Row */
+        .sensor-row {
+            margin: 8px 0;
+            padding: 0;
+            --sensor-icon-color: var(--primary-text-color);
+            transition: opacity 180ms ease-in-out;
         }
+        .sensor-row.alert-active {
+            --sensor-icon-color: rgb(var(--rgb-error-color, 219, 68, 55));
+        }
+        .sensor-row.countdown-active {
+            --sensor-icon-color: rgb(var(--rgb-warning-color, 255, 166, 0));
+        }
+        .sensor-row.closed {
+            --sensor-icon-color: var(--disabled-color, var(--secondary-text-color));
+            opacity: 0.5;
+        }
+
+        .sensor-row-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            cursor: pointer;
+            border-radius: var(--ha-card-border-radius, 12px);
+            transition: background-color 180ms ease-in-out;
+        }
+        .sensor-row-content:hover {
+            background-color: rgba(var(--rgb-primary-text-color, 0, 0, 0), 0.05);
+        }
+
+        /* Sensor Icon Pill */
+        .sensor-icon-pill {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            overflow: hidden;
+        }
+        .sensor-icon-bg {
+            position: absolute;
+            inset: 0;
+            background-color: var(--sensor-icon-color);
+            opacity: 0.2;
+            transition: opacity 180ms ease-in-out;
+        }
+        .sensor-icon-pill ha-icon {
+            position: relative;
+            z-index: 1;
+            color: var(--sensor-icon-color);
+            --mdc-icon-size: 24px;
+            transition: color 180ms ease-in-out;
+        }
+
+        /* Sensor Info */
+        .sensor-info {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+        .sensor-name {
+            font-size: 16px;
+            font-weight: 500;
+            line-height: 1.4;
+            color: var(--primary-text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .sensor-status {
+            font-size: 14px;
+            line-height: 1.4;
+            color: var(--secondary-text-color);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .sensor-status ha-icon {
+            --mdc-icon-size: 16px;
+        }
+
+        /* Sensor Actions */
         .sensor-actions {
             display: flex;
             align-items: center;
+            gap: 12px;
+            padding: 0 12px 12px;
+            flex-wrap: wrap;
         }
+        .sensor-actions > .remaining-time {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 14px;
+            flex: 1;
+            color: var(--sensor-icon-color);
+        }
+        .sensor-actions .remaining-time ha-icon {
+            --mdc-icon-size: 18px;
+        }
+        .sensor-actions ha-button {
+            --ha-button-height: 32px;
+        }
+        .sensor-actions ha-button ha-icon {
+            --mdc-icon-size: 16px;
+        }
+
         .animate-fading {
             animation: fading 2s infinite;
         }
@@ -120,16 +219,12 @@ export class DoorWindowWatcherDialog extends LitElement {
             50% { opacity: 1 }
             100% { opacity: 0.3 }
         }
-        .dialog-filter {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        .sensor-state {
+
+        .empty-state {
             opacity: 0.6;
-            margin-left: 10px;
-            font-size: 12px;
-            font-weight: normal;
+            text-align: center;
+            padding: 24px 16px;
+            color: var(--secondary-text-color);
         }
     `
 
@@ -199,17 +294,13 @@ export class DoorWindowWatcherDialog extends LitElement {
                 .heading=${localize('dialog.title')}
             >
                 <div>
-                    <div class="dialog-filter">
-                        <label>${localize('dialog.only_open')}</label>
-                        <ha-switch
-                            .checked=${this.onlyOpen}
-                            @change=${this.toggleOnlyOpen}
-                        ></ha-switch>
-                    </div>
                     ${sortedSensors.length === 0
-                        ? html`<p style="opacity: 0.6; text-align: center; padding: 16px;">${localize('dialog.no_sensors')}</p>`
+                        ? html`<p class="empty-state">${localize('dialog.no_sensors')}</p>`
                         : sortedSensors.map(sensor => keyed(sensor.entity_id, this.renderDialogSensor(sensor)))
                     }
+                    <div class="toggle-link" @click=${this.toggleOnlyOpen}>
+                        ${this.onlyOpen ? localize('dialog.show_also_closed') : localize('dialog.show_only_open')}
+                    </div>
                 </div>
             </ha-dialog>
         `;
@@ -219,52 +310,74 @@ export class DoorWindowWatcherDialog extends LitElement {
         const localize = getLocalizeFunction(this.hass);
         const haState = this.hass?.states[sensor.entity_id];
         const isOpen = sensor.opened_at !== null;
-        const color_class = {
+
+        const rowClass = {
+            "sensor-row": true,
             "alert-active": sensor.alert_triggered,
             "countdown-active": !sensor.alert_triggered && sensor.remaining_seconds > 0,
-            "inactive": !isOpen || (!sensor.alert_triggered && sensor.remaining_seconds <= 0),
+            "closed": !isOpen,
         };
 
-        if (!isOpen) {
-            return html`
-                <ha-card class="sensor-card">
-                    <div class="sensor-title" @click=${() => this.openMoreInfo(sensor.entity_id)}>
-                        ${haState?.attributes.friendly_name ?? sensor.entity_id}
-                        <span class="sensor-state">
-                            ${this.formatLastChanged(sensor.last_changed)}
-                        </span>
-                    </div>
-                </ha-card>
-            `;
-        }
+        const iconName = isOpen ? "window-open-variant" : "window-closed-variant";
+
+        const statusContent = isOpen
+            ? html`
+                <ha-icon icon="mdi:clock-outline"></ha-icon>
+                <span>${getDurationMmSs(sensor.opened_at)}</span>`
+            : this.formatLastChanged(sensor.last_changed);
+
+        const showDismiss = sensor.remaining_seconds > 0 || sensor.alert_triggered;
 
         return html`
-            <ha-card class="sensor-card">
-                <div class=${classMap({ ...color_class, "sensor-title": true })}
-                     @click=${() => this.openMoreInfo(sensor.entity_id)}>
-                    ${haState?.attributes.friendly_name ?? sensor.entity_id}
-                    <span class=${classMap({ ...color_class, "elapsed-time": true })}>
-                        <ha-icon style="--mdc-icon-size: 18px" icon="mdi:clock-outline"></ha-icon>
-                        <span>${getDurationMmSs(sensor.opened_at)}</span>
-                    </span>
+            <ha-card class=${classMap(rowClass)}>
+                <div class="sensor-row-content" @click=${() => this.openMoreInfo(sensor.entity_id)}>
+                    <div class="sensor-icon-pill">
+                        <div class="sensor-icon-bg"></div>
+                        <ha-icon icon="mdi:${iconName}"></ha-icon>
+                    </div>
+                    <div class="sensor-info">
+                        <div class="sensor-name">${haState?.attributes.friendly_name ?? sensor.entity_id}</div>
+                        <div class="sensor-status">${statusContent}</div>
+                    </div>
                 </div>
-                <div class="sensor-actions">
-                    <span class=${classMap({ ...color_class, "animate-fading": sensor.alert_triggered })}>
-                        ${sensor.remaining_seconds > 0 || sensor.alert_triggered
-                            ? html`<ha-icon icon="mdi:alert-circle"></ha-icon>`
-                            : ""}
-                        <span>${getDurationMmSs(dayjs().subtract(sensor.remaining_seconds, "second"))}</span>
-                    </span>
-                    <ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}>${localize('dialog.add_5_min')}</ha-button>
-                    ${sensor.remaining_seconds > 0
-                        ? html`<ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}>${localize('dialog.sub_5_min')}</ha-button>`
-                        : ""}
-                    ${sensor.remaining_seconds > 0 || sensor.alert_triggered
-                        ? html`<ha-button @click=${(e: Event) => { e.stopPropagation(); this.callService("dismiss_alert", {}, sensor.entity_id); }}><ha-icon icon="mdi:close"></ha-icon></ha-button>`
-                        : ""}
-                </div>
+                ${isOpen ? html`
+                    <div class="sensor-actions">
+                        ${showDismiss ? html`
+                            <span class="remaining-time ${classMap({ "animate-fading": sensor.alert_triggered })}">
+                                <ha-icon icon="mdi:alert-circle"></ha-icon>
+                                <span>${getDurationMmSs(dayjs().subtract(sensor.remaining_seconds, "second"))}</span>
+                            </span>
+                        ` : html`<span class="remaining-time"></span>`}
+                        <ha-button
+                            size="small"
+                            appearance="outlined"
+                            @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}
+                        >
+                            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
+                            ${localize('dialog.add_5_min')}
+                        </ha-button>
+                        <ha-button
+                            size="small"
+                            appearance="outlined"
+                            .disabled=${sensor.remaining_seconds <= 0}
+                            @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}
+                        >
+                            <ha-icon slot="start" icon="mdi:minus"></ha-icon>
+                            ${localize('dialog.sub_5_min')}
+                        </ha-button>
+                        <ha-button
+                            size="small"
+                            appearance="outlined"
+                            .disabled=${!showDismiss}
+                            @click=${(e: Event) => { e.stopPropagation(); this.callService("dismiss_alert", {}, sensor.entity_id); }}
+                        >
+                            <ha-icon slot="start" icon="mdi:close"></ha-icon>
+                            ${localize('dialog.dismiss')}
+                        </ha-button>
+                    </div>
+                ` : ''}
             </ha-card>
-        `
+        `;
     }
 
     private formatLastChanged(isoDate: string): string {

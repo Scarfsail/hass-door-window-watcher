@@ -49,14 +49,92 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
     }
 
     static styles = css`
-        .alert-active { color: var(--error-color) }
-        .countdown-active { color: var(--warning-color) }
-        .inactive { color: var(--primary-text-color) }
-        .header-icon {
+        ha-card {
+            background: transparent;
+            box-shadow: none;
+            border: none;
+        }
+        .icon-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
             cursor: pointer;
-            margin-top: 5px;
-            margin-bottom: 5px;
-            text-align: center;
+            user-select: none;
+            --dww-icon-color: var(--primary-text-color);
+        }
+        .icon-container.alert-active {
+            --dww-icon-color: rgb(var(--rgb-error-color, 219, 68, 55));
+        }
+        .icon-container.countdown-active {
+            --dww-icon-color: rgb(var(--rgb-warning-color, 255, 166, 0));
+        }
+
+        .tile-icon {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            overflow: hidden;
+            transition:
+                transform 180ms ease-in-out,
+                box-shadow 180ms ease-in-out;
+        }
+        .icon-container:active .tile-icon {
+            transform: scale(1.1);
+        }
+
+        .tile-icon-bg {
+            position: absolute;
+            inset: 0;
+            background-color: transparent;
+            transition: background-color 180ms ease-in-out;
+        }
+
+        .tile-icon ha-icon {
+            position: relative;
+            z-index: 1;
+            color: var(--dww-icon-color);
+            --mdc-icon-size: 24px;
+            transition: color 180ms ease-in-out;
+        }
+
+        .alert-active .tile-icon {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+        .countdown-active .tile-icon {
+            box-shadow: 0 0 12px 4px rgba(var(--rgb-warning-color, 255, 166, 0), 0.6);
+        }
+
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 0 0 rgba(var(--rgb-error-color, 219, 68, 55), 0); }
+            50% { box-shadow: 0 0 12px 4px rgba(var(--rgb-error-color, 219, 68, 55), 0.8); }
+            100% { box-shadow: 0 0 0 0 rgba(var(--rgb-error-color, 219, 68, 55), 0); }
+        }
+
+        .count-badge {
+            position: absolute;
+            top: 8px;
+            right: calc(50% - 26px);
+            min-width: 20px;
+            height: 20px;
+            padding: 0 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgb(var(--rgb-primary-color, 0, 154, 199));
+            color: var(--text-primary-color, white);
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            z-index: 2;
+            box-sizing: border-box;
         }
     `
 
@@ -72,16 +150,21 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
         }
 
         const open_sensors = entity.attributes.open_sensors as OpenSensorInfo[];
+        const openCount = open_sensors?.length || 0;
         const iconClass = {
             "alert-active": entity.state == "on",
             "countdown-active": entity.state != "on" && open_sensors.some(s => s.remaining_seconds > 0),
-            "header-icon": true,
+            "icon-container": true,
         };
 
         return html`
             <ha-card>
                 <div class=${classMap(iconClass)} @click=${this.openDialog}>
-                    <ha-icon icon="mdi:window-open-variant"></ha-icon>
+                    <div class="tile-icon">
+                        <div class="tile-icon-bg"></div>
+                        <ha-icon icon="mdi:window-open-variant"></ha-icon>
+                    </div>
+                    ${openCount > 0 ? html`<div class="count-badge">${openCount}</div>` : ''}
                 </div>
             </ha-card>
         `
