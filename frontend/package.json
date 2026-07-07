@@ -1,0 +1,56 @@
+{
+  "name": "door-window-watcher-card",
+  "version": "1.0.0",
+  "description": "A companion card for the Door Window Watcher integration",
+  "main": "dist/door-window-watcher-card-prod.js",
+  "scripts": {
+    "build-dev": "vite build --mode development",
+    "build-prod": "vite build",
+    "watch": "vite build --watch --mode development"
+  },
+  "dependencies": {
+    "lit": "3.3.2",
+    "dayjs": "1.11.19",
+    "home-assistant-js-websocket": "9.6.0"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1",
+    "typescript": "^5.7.2",
+    "ts-lit-plugin": "2.0.2",
+    "@semantic-release/git": "^10.0.1",
+    "semantic-release": "^25.0.3"
+  },
+  "release": {
+    "branches": [
+      "main"
+    ],
+    "plugins": [
+      [
+        "@semantic-release/commit-analyzer",
+        {
+          "preset": "angular",
+          "releaseRules": [
+            {
+              "type": "chore",
+              "scope": "deps",
+              "release": "patch"
+            }
+          ]
+        }
+      ],
+      "@semantic-release/release-notes-generator",
+      [
+        "@semantic-release/github",
+        {
+          "assets": [
+            {
+              "path": "dist/door-window-watcher-card-prod.js",
+              "label": "door-window-watcher-card-prod.js"
+            }
+          ]
+        }
+      ],
+      "@semantic-release/git"
+    ]
+  }
+}
