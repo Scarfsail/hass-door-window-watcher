@@ -3,8 +3,14 @@ NAME = "Door Window Watcher"
 
 CUSTOM_COMPONENTS = "custom_components"
 INTEGRATION_FOLDER = DOMAIN
-PANEL_FOLDER = "frontend"
-PANEL_FILENAME = "dist/door-window-watcher-panel-{env}.js"
+
+FRONTEND_COMPILED_FOLDER = "frontend_compiled"
+FRONTEND_URL_BASE = "/dww_frontend"
+CARD_FILENAME = "door-window-watcher-card.js"
+CARD_URL = f"{FRONTEND_URL_BASE}/{CARD_FILENAME}"
+
+PANEL_FOLDER = FRONTEND_COMPILED_FOLDER
+PANEL_FILENAME = "door-window-watcher-panel.js"
 
 PANEL_URL = "/api/panel_custom/dww"
 PANEL_TITLE = NAME

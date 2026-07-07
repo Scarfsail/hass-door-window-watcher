@@ -5,15 +5,21 @@ export default defineConfig(({ mode }) => {
     return {
         build: {
             lib: {
-                entry: "./cards/door-window-watcher-card.ts",
+                entry: "./config-editor/panel.ts",
                 formats: ["es"],
-                fileName: () => "door-window-watcher-card.js",
+                fileName: () => "door-window-watcher-panel.js",
             },
             emptyOutDir: false,
             outDir: '../custom_components/door_window_watcher/frontend_compiled',
             assetsDir: "compiled",
             sourcemap: !isProduction,
             minify: isProduction,
+            rollupOptions: {
+                external: [
+                    "@home-assistant/frontend/src/components/ha-entity-picker",
+                    /^@home-assistant\/frontend/,
+                ],
+            },
         },
         define: {
             "process.env.NODE_ENV": JSON.stringify(isProduction ? "production" : "development"),

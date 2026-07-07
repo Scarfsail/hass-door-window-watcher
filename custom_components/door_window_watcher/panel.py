@@ -22,8 +22,7 @@ _LOGGER = logging.getLogger(__name__)
 async def async_register_panel(hass):
     root_dir = os.path.join(hass.config.path(CUSTOM_COMPONENTS), INTEGRATION_FOLDER)
     panel_dir = os.path.join(root_dir, PANEL_FOLDER)
-    file_name = PANEL_FILENAME.replace("{env}", "dev" if hass.config.debug else "prod")
-    view_url = os.path.join(panel_dir, file_name)
+    view_url = os.path.join(panel_dir, PANEL_FILENAME)
 
     await hass.http.async_register_static_paths(
         [StaticPathConfig(PANEL_URL, view_url, cache_headers=False)]

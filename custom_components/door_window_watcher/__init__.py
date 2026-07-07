@@ -4,6 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import DOMAIN
+from .frontend import async_register_frontend, async_unregister_card_resource
 from .panel import async_register_panel, async_unregister_panel
 from .services import register_services
 from .watchers.watchers_processor import WatchersProcessor
@@ -28,6 +29,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
     # Register the UI panel
     await async_register_panel(hass)
 
+    # Serve the compiled frontend assets and auto-register the card resource
+    await async_register_frontend(hass)
+
     # Websocket support
     await async_register_websocket_commands(hass)
     register_services(hass)
@@ -45,4 +49,5 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
     # client = hass.data[DOMAIN][entry.entry_id]["client"]
     # client.stop()
     async_unregister_panel(hass)
+    await async_unregister_card_resource(hass)
     return True
