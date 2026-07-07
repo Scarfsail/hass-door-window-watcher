@@ -16,6 +16,7 @@
     ],
   },
   "include": [
-    "src/**/*.ts"
+    "cards/**/*.ts",
+    "config-editor/**/*.ts"
   ],
 }
