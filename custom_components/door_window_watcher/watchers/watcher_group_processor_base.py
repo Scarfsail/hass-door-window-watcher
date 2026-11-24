@@ -3,7 +3,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 import attr
-from sqlalchemy import Boolean
 
 from homeassistant.core import Event, HomeAssistant, State
 from homeassistant.helpers.event import async_track_state_change_event
@@ -15,7 +14,7 @@ from ..models import WatcherGroup
 class OpenSensorInfo:
     entity_id: str = attr.ib()
     opened_at: datetime = attr.ib()
-    remaining_seconds: int = attr.ib(default=0)
+    alert_at: datetime | None = attr.ib(default=None)
     adjusted_seconds: int = attr.ib(default=0)
     alert_triggered: bool = attr.ib(default=False)
     dismissed: bool = attr.ib(default=False)
@@ -29,7 +28,7 @@ class SensorInfo:
     state: str = attr.ib()
     last_changed: str = attr.ib()
     opened_at: str | None = attr.ib(default=None)
-    remaining_seconds: int = attr.ib(default=0)
+    alert_at: str | None = attr.ib(default=None)
     adjusted_seconds: int = attr.ib(default=0)
     alert_triggered: bool = attr.ib(default=False)
     dismissed: bool = attr.ib(default=False)
@@ -46,6 +45,8 @@ class WatcherGroupProcessorBase(ABC):
         self.group = group
         self.open_sensors: dict[str, OpenSensorInfo] = {}
         self.state_changed = state_changed
+        # Entities whose limit had not yet expired at the last recalculation.
+        self._counting_down: set[str] = set()
 
         self._unsubscribe_state = async_track_state_change_event(
             hass, group["entities"], self._handle_state_change
@@ -55,6 +56,7 @@ class WatcherGroupProcessorBase(ABC):
         """Cleanup resources."""
         self._unsubscribe_state()
         self.open_sensors.clear()
+        self._counting_down.clear()
 
     def get_open_sensors(self, only_alerts: bool = False) -> list[OpenSensorInfo]:
         """Get all open sensors."""
@@ -81,7 +83,9 @@ class WatcherGroupProcessorBase(ABC):
                     state=self.group["sensor_open_state"],
                     last_changed=state_obj.last_changed.isoformat(),
                     opened_at=open_info.opened_at.isoformat(),
-                    remaining_seconds=open_info.remaining_seconds,
+                    alert_at=open_info.alert_at.isoformat()
+                    if open_info.alert_at
+                    else None,
                     adjusted_seconds=open_info.adjusted_seconds,
                     alert_triggered=open_info.alert_triggered,
                     dismissed=open_info.dismissed,
@@ -97,11 +101,11 @@ class WatcherGroupProcessorBase(ABC):
 
         return sensors
 
-    def update_open_sensors(self) -> Boolean:
-        """Update remaining time for open sensors."""
+    def update_open_sensors(self) -> bool:
+        """Recalculate open sensors; return True when any of them visibly changed."""
         changed = False
         for sensor in self.open_sensors.values():
-            changed |= self._calculate_remaining_seconds(sensor)
+            changed |= self._update_alert(sensor)
 
         return changed
 
@@ -111,19 +115,20 @@ class WatcherGroupProcessorBase(ABC):
             return
 
         sensor = self.open_sensors[entity_id]
-        sensor.dismissed = False
         max_time_seconds = self._get_max_open_time_seconds()
+        now = datetime.now(UTC)
 
-        if sensor.remaining_seconds == 0:
-            # When remaining time is zero, calculate time since alert was triggered
-            elapsed = datetime.now(UTC) - sensor.opened_at
+        if entity_id not in self._counting_down:
+            # When no time remains, calculate time since alert was triggered
+            elapsed = now - sensor.opened_at
             time_since_alert = elapsed.total_seconds() - max_time_seconds
             sensor.adjusted_seconds = int(time_since_alert + seconds)
         else:
             # When there's remaining time, simply add to adjusted_seconds
             sensor.adjusted_seconds += seconds
 
-        self._calculate_remaining_seconds(sensor)
+        sensor.dismissed = False
+        self._update_alert(sensor)
 
     def dismiss_alert(self, entity_id: str) -> None:
         """Dismiss alert for an open sensor."""
@@ -133,39 +138,41 @@ class WatcherGroupProcessorBase(ABC):
         sensor = self.open_sensors[entity_id]
 
         sensor.dismissed = True
-        sensor.remaining_seconds = 0
+        sensor.alert_at = None
         sensor.alert_triggered = False
+        self._counting_down.discard(entity_id)
 
-    def _calculate_remaining_seconds(self, sensor: OpenSensorInfo) -> Boolean:
-        prev_remaining_seconds = sensor.remaining_seconds
+    def _update_alert(self, sensor: OpenSensorInfo) -> bool:
+        """Recalculate alert_at and alert_triggered; return True when either changed."""
+        previous = (sensor.alert_at, sensor.alert_triggered)
+        was_counting_down = sensor.entity_id in self._counting_down
 
         max_time_seconds = self._get_max_open_time_seconds()
 
         if sensor.dismissed or (max_time_seconds == 0 and sensor.adjusted_seconds == 0):
-            sensor.remaining_seconds = 0
+            sensor.alert_at = None
             sensor.alert_triggered = False
+            self._counting_down.discard(sensor.entity_id)
         else:
-            elapsed = datetime.now(UTC) - sensor.opened_at
-            remaining = (
-                max_time_seconds - elapsed.total_seconds() + sensor.adjusted_seconds
+            sensor.alert_at = sensor.opened_at + timedelta(
+                seconds=max_time_seconds + sensor.adjusted_seconds
             )
-            sensor.remaining_seconds = max(0, int(remaining))
+            remaining = (sensor.alert_at - datetime.now(UTC)).total_seconds()
+            counting_down = int(remaining) > 0
 
-            if (
-                prev_remaining_seconds == 0
-                and sensor.remaining_seconds > 0
-                and sensor.alert_triggered
-            ):
+            # Fire only when the limit expires while counting down; clear when
+            # time is added back. An already-expired limit never fires.
+            if counting_down and not was_counting_down:
                 sensor.alert_triggered = False
-
-            if (
-                sensor.remaining_seconds == 0
-                and prev_remaining_seconds > 0
-                and not sensor.alert_triggered
-            ):
+            elif was_counting_down and not counting_down:
                 sensor.alert_triggered = True
 
-        return prev_remaining_seconds != sensor.remaining_seconds
+            if counting_down:
+                self._counting_down.add(sensor.entity_id)
+            else:
+                self._counting_down.discard(sensor.entity_id)
+
+        return previous != (sensor.alert_at, sensor.alert_triggered)
 
     async def _handle_state_change(self, event: Event) -> None:
         entity_id: str = event.data.get("entity_id")
@@ -180,12 +187,13 @@ class WatcherGroupProcessorBase(ABC):
                     entity_id=entity_id, opened_at=datetime.now(UTC)
                 )
 
-                self._calculate_remaining_seconds(sensor)
+                self._update_alert(sensor)
                 self.open_sensors[entity_id] = sensor
                 self.state_changed()
 
         elif entity_id in self.open_sensors:
             del self.open_sensors[entity_id]
+            self._counting_down.discard(entity_id)
             self.state_changed()
 
     @abstractmethod

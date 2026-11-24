@@ -1,15 +1,18 @@
 import { LitElement, css, html, nothing } from "lit-element"
+import type { PropertyValues } from "lit";
 import { customElement, property, state } from "lit/decorators.js";
 import type { HomeAssistant } from "../hass-frontend/src/types";
-import { SensorInfo } from "./models";
-import dayjs from "dayjs";
-import duration from 'dayjs/plugin/duration'
-import { getDurationMmSs } from "./time_utils";
+import { OpenSensorInfo, SensorInfo } from "./models";
+import { formatMmSs, fractionElapsed, secondsLeft, secondsOver, secondsSince } from "./time_utils";
 import { classMap } from "lit/directives/class-map.js";
 import { keyed } from 'lit/directives/keyed.js';
-import { getLocalizeFunction } from "./localize";
+import { getLocalizeFunction, LocalizeFunction } from "./localize";
+import { subscribeTicker } from "./ticker";
 
-dayjs.extend(duration);
+/** Seconds the dialog waits after the alert clears before it closes itself. */
+const AUTO_CLOSE_SECONDS = 10;
+
+type RowGroup = "over_limit" | "counting_down" | "no_limit" | "closed";
 
 export interface DoorWindowWatcherDialogParams {
     entityId: string;
@@ -22,18 +25,78 @@ export class DoorWindowWatcherDialog extends LitElement {
     @state() private _params?: DoorWindowWatcherDialogParams;
     @state() private onlyOpen = true;
     @state() private monitoredEntityIds: string[] = [];
+    /** Set by the shared ticker so the clocks advance without state pushes. */
+    @state() private tickAt = 0;
+    /** When the auto-close countdown ends; undefined while no countdown runs. */
+    @state() private closeAt?: number;
+    private closeTimer?: number;
+    /** Entities listed since the dialog opened, so a window closed meanwhile stays visible. */
+    private shownIds = new Set<string>();
+    private unsubscribeTicker?: () => void;
 
     public showDialog(params: DoorWindowWatcherDialogParams): void {
         this._params = params;
+        this.shownIds = new Set();
+        this.unsubscribeTicker ??= subscribeTicker(() => this.tickAt = Date.now());
     }
 
     public closeDialog(): void {
+        this.stopCountdown();
+        this.stopTicker();
         this._params = undefined;
         this.dispatchEvent(new CustomEvent("dialog-closed", {
             bubbles: true,
             composed: true,
             detail: { dialog: "door-window-watcher-dialog" },
         }));
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this.stopCountdown();
+        this.stopTicker();
+    }
+
+    private stopTicker() {
+        this.unsubscribeTicker?.();
+        this.unsubscribeTicker = undefined;
+    }
+
+    private startCountdown() {
+        if (this.closeAt !== undefined) return;
+        this.closeAt = Date.now() + AUTO_CLOSE_SECONDS * 1000;
+        this.closeTimer = window.setTimeout(() => this.closeDialog(), AUTO_CLOSE_SECONDS * 1000);
+    }
+
+    private stopCountdown() {
+        window.clearTimeout(this.closeTimer);
+        this.closeTimer = undefined;
+        this.closeAt = undefined;
+    }
+
+    /** A new hass object redraws only when the alert entity (or, with "Show closed", a monitored entity) changed. */
+    protected shouldUpdate(changed: PropertyValues): boolean {
+        if (!this._params) return changed.has("_params");
+        if (!changed.has("hass") || changed.size > 1) return true;
+
+        const oldHass = changed.get("hass") as HomeAssistant | undefined;
+        if (!oldHass) return true;
+
+        const ids = this.onlyOpen ? [this._params.entityId] : [this._params.entityId, ...this.monitoredEntityIds];
+        return ids.some(id => oldHass.states[id] !== this.hass.states[id]);
+    }
+
+    protected willUpdate(changed: PropertyValues) {
+        if (!this._params || !changed.has("hass")) return;
+
+        const entityId = this._params.entityId;
+        const before = (changed.get("hass") as HomeAssistant | undefined)?.states[entityId]?.state;
+        const after = this.hass.states[entityId]?.state;
+        if (before === "on" && after === "off") {
+            this.startCountdown();
+        } else if (after === "on") {
+            this.stopCountdown();
+        }
     }
 
     private async toggleOnlyOpen() {
@@ -62,29 +125,204 @@ export class DoorWindowWatcherDialog extends LitElement {
         }
     }
 
-    private sortAllSensors(sensors: SensorInfo[]): SensorInfo[] {
-        return [...sensors].sort((a, b) => {
-            if (a.alert_triggered && !b.alert_triggered) return -1;
-            if (!a.alert_triggered && b.alert_triggered) return 1;
+    /** Splits sensors into the dialog's groups, each sorted by urgency. */
+    private groupSensors(sensors: SensorInfo[]): Record<RowGroup, SensorInfo[]> {
+        const byAlertAt = (a: SensorInfo, b: SensorInfo) =>
+            new Date(a.alert_at!).getTime() - new Date(b.alert_at!).getTime();
+        const open = sensors.filter(s => s.opened_at !== null);
 
-            const aOpen = a.opened_at !== null;
-            const bOpen = b.opened_at !== null;
-
-            if (aOpen && bOpen) {
-                if (a.remaining_seconds > 0 && b.remaining_seconds > 0)
-                    return a.remaining_seconds - b.remaining_seconds;
-                if (a.remaining_seconds > 0) return -1;
-                if (b.remaining_seconds > 0) return 1;
-            }
-
-            if (aOpen && !bOpen) return -1;
-            if (!aOpen && bOpen) return 1;
-
-            return new Date(b.last_changed).getTime() - new Date(a.last_changed).getTime();
-        });
+        return {
+            over_limit: open.filter(s => s.alert_triggered).sort(byAlertAt),
+            counting_down: open.filter(s => !s.alert_triggered && s.alert_at !== null).sort(byAlertAt),
+            no_limit: open.filter(s => !s.alert_triggered && s.alert_at === null)
+                .sort((a, b) => new Date(a.opened_at!).getTime() - new Date(b.opened_at!).getTime()),
+            closed: sensors.filter(s => s.opened_at === null)
+                .sort((a, b) => new Date(b.last_changed).getTime() - new Date(a.last_changed).getTime()),
+        };
     }
 
     static styles = css`
+        ha-dialog {
+            --dialog-content-padding: 0 16px 8px;
+        }
+
+        /* Auto-close banner */
+        .banner {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+            padding: 10px 12px 12px;
+            border-radius: var(--ha-card-border-radius, 12px);
+            background-color: rgba(var(--rgb-success-color, 67, 160, 71), 0.15);
+            overflow: hidden;
+        }
+        .banner > ha-icon {
+            color: rgb(var(--rgb-success-color, 67, 160, 71));
+            flex-shrink: 0;
+        }
+        .banner-text {
+            flex: 1;
+            min-width: 0;
+        }
+        .banner-title {
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--primary-text-color);
+        }
+        .banner-sub {
+            font-size: 12px;
+            color: var(--secondary-text-color);
+            font-variant-numeric: tabular-nums;
+        }
+        .banner-bar {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            height: 3px;
+            width: 100%;
+            background-color: rgb(var(--rgb-success-color, 67, 160, 71));
+            animation: drain linear forwards;
+        }
+        @keyframes drain {
+            from { width: 100%; }
+            to { width: 0%; }
+        }
+
+        .group-header {
+            margin: 12px 4px 6px;
+            font-size: 11px;
+            font-weight: 500;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: var(--secondary-text-color);
+        }
+
+        /* Sensor Row */
+        .row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 6px;
+            padding: 10px 12px;
+            border-radius: var(--ha-card-border-radius, 12px);
+            cursor: pointer;
+            --row-color: var(--secondary-text-color);
+            --row-bg: transparent;
+            background-color: var(--row-bg);
+            transition: opacity 180ms ease-in-out;
+        }
+        .row.over_limit {
+            --row-color: rgb(var(--rgb-error-color, 219, 68, 55));
+            --row-bg: rgba(var(--rgb-error-color, 219, 68, 55), 0.1);
+        }
+        .row.counting_down {
+            --row-color: rgb(var(--rgb-warning-color, 255, 166, 0));
+            --row-bg: rgba(var(--rgb-warning-color, 255, 166, 0), 0.1);
+        }
+        .row.no_limit {
+            --row-color: rgb(var(--rgb-info-color, 3, 155, 229));
+            --row-bg: rgba(var(--rgb-info-color, 3, 155, 229), 0.1);
+        }
+        .row.closed {
+            opacity: 0.6;
+        }
+        .row:hover {
+            filter: brightness(0.97);
+        }
+
+        .row-icon {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            background-color: color-mix(in srgb, var(--row-color) 20%, transparent);
+        }
+        .row-icon ha-icon {
+            color: var(--row-color);
+            --mdc-icon-size: 22px;
+        }
+
+        .row-main {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .row-head {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .name {
+            flex: 1;
+            min-width: 0;
+            font-size: 15px;
+            font-weight: 500;
+            line-height: 1.4;
+            color: var(--primary-text-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .value {
+            font-size: 13px;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            color: var(--row-color);
+            white-space: nowrap;
+        }
+        .detail {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--secondary-text-color);
+        }
+        .detail ha-icon {
+            --mdc-icon-size: 14px;
+        }
+
+        .bar {
+            height: 4px;
+            border-radius: 2px;
+            background-color: color-mix(in srgb, var(--row-color) 20%, transparent);
+            overflow: hidden;
+        }
+        .bar > div {
+            height: 100%;
+            border-radius: 2px;
+            background-color: var(--row-color);
+            transition: width 1s linear;
+        }
+
+        .chips {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+            margin-top: 2px;
+        }
+        .chip {
+            font: inherit;
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1;
+            padding: 6px 10px;
+            border-radius: 8px;
+            border: 1px solid var(--divider-color, rgba(0, 0, 0, 0.12));
+            background-color: var(--card-background-color, white);
+            color: var(--primary-text-color);
+            cursor: pointer;
+        }
+        .chip:hover {
+            border-color: var(--row-color);
+        }
+
         .toggle-link {
             display: block;
             text-align: center;
@@ -98,133 +336,17 @@ export class DoorWindowWatcherDialog extends LitElement {
             opacity: 0.8;
         }
 
-        /* Sensor Row */
-        .sensor-row {
-            margin: 8px 0;
-            padding: 0;
-            --sensor-icon-color: var(--primary-text-color);
-            transition: opacity 180ms ease-in-out;
-        }
-        .sensor-row.alert-active {
-            --sensor-icon-color: rgb(var(--rgb-error-color, 219, 68, 55));
-        }
-        .sensor-row.countdown-active {
-            --sensor-icon-color: rgb(var(--rgb-warning-color, 255, 166, 0));
-        }
-        .sensor-row.closed {
-            --sensor-icon-color: var(--disabled-color, var(--secondary-text-color));
-            opacity: 0.5;
-        }
-
-        .sensor-row-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px;
-            cursor: pointer;
-            border-radius: var(--ha-card-border-radius, 12px);
-            transition: background-color 180ms ease-in-out;
-        }
-        .sensor-row-content:hover {
-            background-color: rgba(var(--rgb-primary-text-color, 0, 0, 0), 0.05);
-        }
-
-        /* Sensor Icon Pill */
-        .sensor-icon-pill {
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            flex-shrink: 0;
-            overflow: hidden;
-        }
-        .sensor-icon-bg {
-            position: absolute;
-            inset: 0;
-            background-color: var(--sensor-icon-color);
-            opacity: 0.2;
-            transition: opacity 180ms ease-in-out;
-        }
-        .sensor-icon-pill ha-icon {
-            position: relative;
-            z-index: 1;
-            color: var(--sensor-icon-color);
-            --mdc-icon-size: 24px;
-            transition: color 180ms ease-in-out;
-        }
-
-        /* Sensor Info */
-        .sensor-info {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            min-width: 0;
-        }
-        .sensor-name {
-            font-size: 16px;
-            font-weight: 500;
-            line-height: 1.4;
-            color: var(--primary-text-color);
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-        .sensor-status {
-            font-size: 14px;
-            line-height: 1.4;
-            color: var(--secondary-text-color);
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-        .sensor-status ha-icon {
-            --mdc-icon-size: 16px;
-        }
-
-        /* Sensor Actions */
-        .sensor-actions {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 0 12px 12px;
-            flex-wrap: wrap;
-        }
-        .sensor-actions > .remaining-time {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 14px;
-            flex: 1;
-            color: var(--sensor-icon-color);
-        }
-        .sensor-actions .remaining-time ha-icon {
-            --mdc-icon-size: 18px;
-        }
-        .sensor-actions ha-button {
-            --ha-button-height: 32px;
-        }
-        .sensor-actions ha-button ha-icon {
-            --mdc-icon-size: 16px;
-        }
-
-        .animate-fading {
-            animation: fading 2s infinite;
-        }
-        @keyframes fading {
-            0% { opacity: 0.3 }
-            50% { opacity: 1 }
-            100% { opacity: 0.3 }
-        }
-
         .empty-state {
             opacity: 0.6;
             text-align: center;
             padding: 24px 16px;
             color: var(--secondary-text-color);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .bar > div {
+                transition: none;
+            }
         }
     `
 
@@ -243,60 +365,60 @@ export class DoorWindowWatcherDialog extends LitElement {
         const entity = this.hass.states[this._params.entityId];
         if (!entity) return [];
 
-        // Always get current open sensors from attributes
-        const openSensors = (entity.attributes.open_sensors || []) as any[];
-        const openSensorMap = new Map(
-            openSensors.map(s => [s.entity_id, s])
-        );
+        const openSensors = (entity.attributes.open_sensors ?? []) as OpenSensorInfo[];
+        const openIds = new Set(openSensors.map(s => s.entity_id));
+        openIds.forEach(id => this.shownIds.add(id));
 
-        if (this.onlyOpen) {
-            // Show only open sensors
-            return openSensors.map(s => ({
-                entity_id: s.entity_id,
-                state: this.hass.states[s.entity_id]?.state || "on",
-                last_changed: this.hass.states[s.entity_id]?.last_changed || "",
-                opened_at: s.opened_at,
-                remaining_seconds: s.remaining_seconds,
-                adjusted_seconds: s.adjusted_seconds,
-                alert_triggered: s.alert_triggered,
+        const open: SensorInfo[] = openSensors.map(s => ({
+            ...s,
+            state: this.hass.states[s.entity_id]?.state || "on",
+            last_changed: this.hass.states[s.entity_id]?.last_changed || "",
+        }));
+
+        // Closed rows: windows that closed while the dialog is open, plus every monitored one with "Show closed".
+        const closedIds = new Set([...this.shownIds, ...(this.onlyOpen ? [] : this.monitoredEntityIds)]);
+        const closed: SensorInfo[] = [...closedIds]
+            .filter(id => !openIds.has(id) && this.hass.states[id])
+            .map(id => ({
+                entity_id: id,
+                state: this.hass.states[id].state,
+                last_changed: this.hass.states[id].last_changed,
+                opened_at: null,
+                alert_at: null,
+                adjusted_seconds: 0,
+                alert_triggered: false,
                 dismissed: false,
             }));
-        }
 
-        // Show all monitored sensors - get state from attributes and hass.states
-        return this.monitoredEntityIds.map(entityId => {
-            const entityState = this.hass.states[entityId];
-            const openInfo = openSensorMap.get(entityId);
-            
-            return {
-                entity_id: entityId,
-                state: entityState?.state || "unknown",
-                last_changed: entityState?.last_changed || "",
-                opened_at: openInfo?.opened_at || null,
-                remaining_seconds: openInfo?.remaining_seconds || 0,
-                adjusted_seconds: openInfo?.adjusted_seconds || 0,
-                alert_triggered: openInfo?.alert_triggered || false,
-                dismissed: false,
-            };
-        }).filter(s => this.hass.states[s.entity_id]); // Only include entities that exist
+        return [...open, ...closed];
     }
 
     render() {
         if (!this._params) return nothing;
 
         const localize = getLocalizeFunction(this.hass);
-        const sortedSensors = this.sortAllSensors(this.getSensorsToDisplay());
+        const now = Date.now();
+        const sensors = this.getSensorsToDisplay();
+        const groups = this.groupSensors(sensors);
+        const groupOrder: RowGroup[] = ["over_limit", "counting_down", "no_limit", "closed"];
 
         return html`
             <ha-dialog
                 open
                 @closed=${this.closeDialog}
-                .heading=${localize('dialog.title')}
+                @pointerdown=${this.stopCountdown}
+                .headerTitle=${localize('dialog.title')}
             >
                 <div>
-                    ${sortedSensors.length === 0
+                    ${this.closeAt !== undefined ? this.renderBanner(now, localize) : nothing}
+                    ${sensors.length === 0
                         ? html`<p class="empty-state">${localize('dialog.no_sensors')}</p>`
-                        : sortedSensors.map(sensor => keyed(sensor.entity_id, this.renderDialogSensor(sensor)))
+                        : groupOrder.map(group => groups[group].length === 0 ? nothing : html`
+                            ${group !== "closed" || !this.onlyOpen
+                                ? html`<div class="group-header">${localize(`dialog.group_${group}`)}</div>`
+                                : nothing}
+                            ${groups[group].map(sensor => keyed(sensor.entity_id, this.renderRow(sensor, group, now, localize)))}
+                        `)
                     }
                     <div class="toggle-link" @click=${this.toggleOnlyOpen}>
                         ${this.onlyOpen ? localize('dialog.show_also_closed') : localize('dialog.show_only_open')}
@@ -306,95 +428,101 @@ export class DoorWindowWatcherDialog extends LitElement {
         `;
     }
 
-    private renderDialogSensor(sensor: SensorInfo) {
-        const localize = getLocalizeFunction(this.hass);
-        const haState = this.hass?.states[sensor.entity_id];
-        const isOpen = sensor.opened_at !== null;
-
-        const rowClass = {
-            "sensor-row": true,
-            "alert-active": sensor.alert_triggered,
-            "countdown-active": !sensor.alert_triggered && sensor.remaining_seconds > 0,
-            "closed": !isOpen,
-        };
-
-        const iconName = isOpen ? "window-open-variant" : "window-closed-variant";
-
-        const statusContent = isOpen
-            ? html`
-                <ha-icon icon="mdi:clock-outline"></ha-icon>
-                <span>${getDurationMmSs(sensor.opened_at)}</span>`
-            : this.formatLastChanged(sensor.last_changed);
-
-        const showDismiss = sensor.remaining_seconds > 0 || sensor.alert_triggered;
-
+    private renderBanner(now: number, localize: LocalizeFunction) {
+        const seconds = Math.max(0, Math.ceil((this.closeAt! - now) / 1000));
         return html`
-            <ha-card class=${classMap(rowClass)}>
-                <div class="sensor-row-content" @click=${() => this.openMoreInfo(sensor.entity_id)}>
-                    <div class="sensor-icon-pill">
-                        <div class="sensor-icon-bg"></div>
-                        <ha-icon icon="mdi:${iconName}"></ha-icon>
-                    </div>
-                    <div class="sensor-info">
-                        <div class="sensor-name">${haState?.attributes.friendly_name ?? sensor.entity_id}</div>
-                        <div class="sensor-status">${statusContent}</div>
-                    </div>
+            <div class="banner">
+                <ha-icon icon="mdi:check-circle"></ha-icon>
+                <div class="banner-text">
+                    <div class="banner-title">${localize('dialog.all_clear')}</div>
+                    <div class="banner-sub">${localize('dialog.closing_in', { seconds })}</div>
                 </div>
-                ${isOpen ? html`
-                    <div class="sensor-actions">
-                        ${showDismiss ? html`
-                            <span class="remaining-time ${classMap({ "animate-fading": sensor.alert_triggered })}">
-                                <ha-icon icon="mdi:alert-circle"></ha-icon>
-                                <span>${getDurationMmSs(dayjs().subtract(sensor.remaining_seconds, "second"))}</span>
-                            </span>
-                        ` : html`<span class="remaining-time"></span>`}
-                        <ha-button
-                            .size=${'small'}
-                            .appearance=${'outlined'}
-                            @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id); }}
-                        >
-                            <ha-icon slot="start" icon="mdi:plus"></ha-icon>
-                            ${localize('dialog.add_5_min')}
-                        </ha-button>
-                        <ha-button
-                            .size=${'small'}
-                            .appearance=${'outlined'}
-                            .disabled=${sensor.remaining_seconds <= 0}
-                            @click=${(e: Event) => { e.stopPropagation(); this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id); }}
-                        >
-                            <ha-icon slot="start" icon="mdi:minus"></ha-icon>
-                            ${localize('dialog.sub_5_min')}
-                        </ha-button>
-                        <ha-button
-                            .size=${'small'}
-                            .appearance=${'outlined'}
-                            .disabled=${!showDismiss}
-                            @click=${(e: Event) => { e.stopPropagation(); this.callService("dismiss_alert", {}, sensor.entity_id); }}
-                        >
-                            <ha-icon slot="start" icon="mdi:close"></ha-icon>
-                            ${localize('dialog.dismiss')}
-                        </ha-button>
-                    </div>
-                ` : ''}
-            </ha-card>
+                <ha-button size="s" variant="success" appearance="accent" @click=${this.stopCountdown}>
+                    ${localize('dialog.keep_open')}
+                </ha-button>
+                <div class="banner-bar" style="animation-duration: ${AUTO_CLOSE_SECONDS}s"></div>
+            </div>
         `;
     }
 
-    private formatLastChanged(isoDate: string): string {
-        const localize = getLocalizeFunction(this.hass);
-        const diff = dayjs().diff(dayjs(isoDate));
-        const dur = dayjs.duration(diff);
-        const hours = Math.floor(dur.asHours());
-        const minutes = dur.minutes();
+    private renderRow(sensor: SensorInfo, group: RowGroup, now: number, localize: LocalizeFunction) {
+        const name = this.hass.states[sensor.entity_id]?.attributes.friendly_name ?? sensor.entity_id;
+        const { opened_at, alert_at } = sensor;
 
-        if (hours > 24) {
-            const days = Math.floor(hours / 24);
-            return localize('time.days_ago', { days: days.toString() });
+        let value: string;
+        let detail: unknown = nothing;
+        let remainingShare: number | undefined;
+
+        switch (group) {
+            case "over_limit":
+                value = "+" + formatMmSs(secondsOver(alert_at!, now));
+                detail = html`<ha-icon icon="mdi:clock-outline"></ha-icon>${localize('dialog.open_limit', {
+                    open: formatMmSs(secondsSince(opened_at!, now)),
+                    limit: formatMmSs(secondsSince(opened_at!, new Date(alert_at!).getTime())),
+                })}`;
+                break;
+            case "counting_down":
+                value = formatMmSs(secondsLeft(alert_at!, now));
+                remainingShare = 1 - fractionElapsed(opened_at!, alert_at!, now);
+                break;
+            case "no_limit":
+                value = formatMmSs(secondsSince(opened_at!, now));
+                if (sensor.dismissed) detail = localize('dialog.dismissed');
+                break;
+            case "closed":
+                value = this.shownIds.has(sensor.entity_id)
+                    ? localize('dialog.just_now')
+                    : this.formatLastChanged(sensor.last_changed, now, localize);
+                detail = localize('dialog.closed');
+                break;
+        }
+
+        return html`
+            <div class=${classMap({ row: true, [group]: true })} @click=${() => this.openMoreInfo(sensor.entity_id)}>
+                <div class="row-icon">
+                    <ha-icon icon=${group === "closed" ? "mdi:window-closed-variant" : "mdi:window-open-variant"}></ha-icon>
+                </div>
+                <div class="row-main">
+                    <div class="row-head">
+                        <span class="name">${name}</span>
+                        <span class="value">${value}</span>
+                    </div>
+                    ${detail !== nothing ? html`<div class="detail">${detail}</div>` : nothing}
+                    ${remainingShare !== undefined
+                        ? html`<div class="bar"><div style="width: ${remainingShare * 100}%"></div></div>`
+                        : nothing}
+                    ${group !== "closed" ? html`
+                        <div class="chips">
+                            ${this.renderChip(localize('dialog.add_5_min'), () => this.callService("adjust_remaining_seconds", { seconds: 300 }, sensor.entity_id))}
+                            ${group === "counting_down"
+                                ? this.renderChip(localize('dialog.sub_5_min'), () => this.callService("adjust_remaining_seconds", { seconds: -300 }, sensor.entity_id))
+                                : nothing}
+                            ${group !== "no_limit"
+                                ? this.renderChip(localize('dialog.dismiss'), () => this.callService("dismiss_alert", {}, sensor.entity_id))
+                                : nothing}
+                        </div>
+                    ` : nothing}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderChip(label: string, action: () => void) {
+        return html`<button class="chip" @click=${(e: Event) => { e.stopPropagation(); action(); }}>${label}</button>`;
+    }
+
+    private formatLastChanged(isoDate: string, now: number, localize: LocalizeFunction): string {
+        const totalMinutes = Math.floor(Math.max(0, secondsSince(isoDate, now)) / 60);
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+
+        if (hours >= 24) {
+            return localize('time.days_ago', { days: Math.floor(hours / 24) });
         }
         if (hours > 0) {
-            return localize('time.hours_minutes_ago', { hours: hours.toString(), minutes: minutes.toString() });
+            return localize('time.hours_minutes_ago', { hours, minutes });
         }
-        return localize('time.minutes_ago', { minutes: minutes.toString() });
+        return localize('time.minutes_ago', { minutes });
     }
 
     private async callService(service: string, data: any, entity_id: string) {

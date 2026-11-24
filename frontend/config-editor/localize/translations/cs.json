@@ -2,29 +2,34 @@
   "panel": {
     "no_config": "Žádná konfigurace",
     "header": "Hlídač dveří a oken",
-    "groups": "Skupiny",
-    "save": "Uložit"
+    "save": "Uložit",
+    "unsaved_changes": "Neuložené změny",
+    "saved": "Uloženo",
+    "save_failed": "Uložení selhalo: {error}"
   },
   "groups": {
     "no_groups": "Žádné skupiny",
     "add_group": "Přidat skupinu",
     "new_group": "Nová skupina",
-    "no_group": "Žádná skupina"
+    "no_group": "Žádná skupina",
+    "entity_count": "dveře a okna: {count}",
+    "minutes": "{minutes} min",
+    "seconds": "{seconds} s"
   },
   "editor": {
-    "parameters": "Parametry:",
-    "watch_time_based_on": "Čas hlídání podle",
+    "name": "Název",
     "fixed_time": "Pevný čas",
-    "temperature_based": "Vnitřní a venkovní teplota",
+    "temperature_based": "Podle teploty",
     "sensor_open_state": "Stav otevření senzoru",
-    "door_windows": "Dveře / Okna:",
-    "enter_new_title": "Zadejte nový název",
-    "max_duration_sec": "Maximální doba (sec)",
-    "select_indoor_temp": "Vyberte senzor vnitřní teploty",
-    "select_outdoor_temp": "Vyberte senzor venkovní teploty",
-    "temperature_diff": "Rozdíl teplot (°C)",
-    "time_diff": "Časový rozdíl (sec)",
-    "max_temperature": "Maximální teplota (°C)",
-    "select_door_window": "Vyberte dveře nebo okno"
+    "door_windows": "Dveře a okna",
+    "add": "Přidat",
+    "delete_group": "Smazat skupinu",
+    "remove": "Odebrat",
+    "max_duration": "Maximální doba otevření",
+    "indoor_temp": "Vnitřní teplota",
+    "outdoor_temp": "Venkovní teplota",
+    "temperature_diff": "Rozdíl teplot",
+    "time_diff": "Povolená doba při tomto rozdílu",
+    "max_temperature": "Maximální venkovní teplota"
   }
 }

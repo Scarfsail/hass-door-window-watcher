@@ -1,0 +1,35 @@
+{
+  "panel": {
+    "no_config": "No configuration",
+    "header": "Door Window Watcher",
+    "save": "Save",
+    "unsaved_changes": "Unsaved changes",
+    "saved": "Saved",
+    "save_failed": "Saving failed: {error}"
+  },
+  "groups": {
+    "no_groups": "No groups",
+    "add_group": "Add group",
+    "new_group": "New group",
+    "no_group": "No group",
+    "entity_count": "doors & windows: {count}",
+    "minutes": "{minutes} min",
+    "seconds": "{seconds} s"
+  },
+  "editor": {
+    "name": "Name",
+    "fixed_time": "Fixed time",
+    "temperature_based": "Temperature based",
+    "sensor_open_state": "Sensor open state",
+    "door_windows": "Doors & windows",
+    "add": "Add",
+    "delete_group": "Delete group",
+    "remove": "Remove",
+    "max_duration": "Maximum open time",
+    "indoor_temp": "Indoor temperature",
+    "outdoor_temp": "Outdoor temperature",
+    "temperature_diff": "Temperature difference",
+    "time_diff": "Allowed time at that difference",
+    "max_temperature": "Max outdoor temperature"
+  }
+}

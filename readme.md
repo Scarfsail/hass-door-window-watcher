@@ -103,6 +103,28 @@ The binary sensor includes various attributes that show:
 
 You can access all these details through the entity's attributes in automations, scripts, and the Lovelace UI.
 
+The `open_sensors` attribute lists one entry per open door/window:
+
+| Key | Description |
+|-----|-------------|
+| `entity_id` | The door/window sensor |
+| `opened_at` | When it was opened (ISO datetime) |
+| `alert_at` | When the alert fires (ISO datetime), or `null` when there is no limit or the alert was dismissed |
+| `adjusted_seconds` | Time added or removed with the `adjust_remaining_seconds` service |
+| `alert_triggered` | `true` once the door/window is open past its limit |
+| `dismissed` | `true` when the alert was dismissed |
+
+The entity is written only when something visible changes (a door/window opens or closes, an alert fires or
+clears, time is adjusted, an alert is dismissed), not every second. The `get_sensors` and `get_open_sensors`
+services return the same keys.
+
+### Upgrading
+
+`remaining_seconds` is gone from the entity attributes and from the `get_sensors` / `get_open_sensors`
+responses. Compute it as `alert_at - now`, for example in a template:
+`{{ (as_datetime(sensor.alert_at) - now()).total_seconds() | int if sensor.alert_at else 0 }}`. The `get_open_sensors` response key is
+now `open_sensors` (it was misspelled `open_sensors:`).
+
 ## Troubleshooting
 
 If you experience any issues:

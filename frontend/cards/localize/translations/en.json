@@ -1,0 +1,33 @@
+{
+  "card": {
+    "no_config": "No configuration defined",
+    "entity_not_found": "Entity {entity} not found",
+    "name": "Door Window Watcher Card",
+    "description": "Card for the Door Window Watcher integration"
+  },
+  "dialog": {
+    "title": "Open doors & windows",
+    "no_sensors": "All doors and windows are closed.",
+    "show_also_closed": "Show closed",
+    "show_only_open": "Show only open",
+    "add_5_min": "+5 min",
+    "sub_5_min": "−5 min",
+    "dismiss": "Dismiss",
+    "group_over_limit": "Over limit",
+    "group_counting_down": "Counting down",
+    "group_no_limit": "Open, no limit",
+    "group_closed": "Closed",
+    "open_limit": "open {open} · limit {limit}",
+    "dismissed": "dismissed",
+    "closed": "closed",
+    "just_now": "just now",
+    "all_clear": "All clear",
+    "closing_in": "Closing in {seconds} s",
+    "keep_open": "Keep open"
+  },
+  "time": {
+    "days_ago": "{days}d ago",
+    "hours_minutes_ago": "{hours}h {minutes}m ago",
+    "minutes_ago": "{minutes}m ago"
+  }
+}
