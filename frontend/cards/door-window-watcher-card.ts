@@ -1,11 +1,14 @@
-import { LitElement, css, html } from "lit-element"
-import { customElement, state } from "lit/decorators.js";
+import { LitElement, css, html, svg } from "lit-element"
+import { customElement } from "lit/decorators.js";
+import type { HassEntity } from "home-assistant-js-websocket";
 import type { HomeAssistant } from "../hass-frontend/src/types";
 import type { LovelaceCard } from "../hass-frontend/src/panels/lovelace/types";
 import type { LovelaceCardConfig } from "../hass-frontend/src/data/lovelace/config/card";
 import { OpenSensorInfo } from "./models";
 import { classMap } from "lit/directives/class-map.js";
 import { getLocalizeFunction } from "./localize";
+import { formatMmSs, fractionElapsed, isCountingDown, secondsLeft } from "./time_utils";
+import { subscribeTicker } from "./ticker";
 import "./door-window-watcher-dialog";
 import type { DoorWindowWatcherDialogParams } from "./door-window-watcher-dialog";
 
@@ -18,19 +21,26 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
 
     private config?: DoorWindowWatcherCardConfig;
     private dialogOpen = false;
-    @state() private _hass?: HomeAssistant;
+    private _hass?: HomeAssistant;
+    private _entity?: HassEntity;
+    private _unsubscribeTicker?: () => void;
+    private _tick = () => this.requestUpdate();
 
     public set hass(value: HomeAssistant) {
-        const entity_old = this.config ? this._hass?.states[this.config.entity] : undefined;
-        const entity_new = this.config ? value?.states[this.config.entity] : undefined;
-        if (entity_new) {
-            if (entity_old?.state != entity_new.state) {
-                if (entity_new.state == "on" && !this.dialogOpen) {
-                    this.openDialog();
-                }
-            }
-        }
+        const languageChanged = value?.language !== this._hass?.language;
         this._hass = value;
+        const entity = this.config ? value?.states[this.config.entity] : undefined;
+        if (entity === this._entity) {
+            // Re-render so the text switches to the new profile language.
+            if (languageChanged) this.requestUpdate();
+            return;
+        }
+
+        if (entity && entity.state != this._entity?.state && entity.state == "on" && !this.dialogOpen) {
+            this.openDialog();
+        }
+        this._entity = entity;
+        this.requestUpdate();
     }
 
     getCardSize() {
@@ -46,6 +56,38 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
 
     async setConfig(config: DoorWindowWatcherCardConfig) {
         this.config = config;
+        this._entity = this._hass?.states[config.entity];
+        this.requestUpdate();
+    }
+
+    connectedCallback() {
+        super.connectedCallback();
+        // Resume the ticker (if counting down) after the dashboard re-attaches the card.
+        this.requestUpdate();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        this.stopTicker();
+    }
+
+    private get openSensors(): OpenSensorInfo[] {
+        return (this._entity?.attributes.open_sensors ?? []) as OpenSensorInfo[];
+    }
+
+    protected updated() {
+        // An update queued before removal still runs; don't resubscribe a detached card.
+        const counting = this.isConnected && this.openSensors.some(s => isCountingDown(s));
+        if (counting) {
+            this._unsubscribeTicker ??= subscribeTicker(this._tick);
+        } else {
+            this.stopTicker();
+        }
+    }
+
+    private stopTicker() {
+        this._unsubscribeTicker?.();
+        this._unsubscribeTicker = undefined;
     }
 
     static styles = css`
@@ -62,13 +104,20 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
             padding: 16px;
             cursor: pointer;
             user-select: none;
-            --dww-icon-color: var(--primary-text-color);
+            --dww-color: var(--secondary-text-color);
+            --dww-bg: var(--secondary-background-color, rgba(127, 127, 127, 0.15));
         }
-        .icon-container.alert-active {
-            --dww-icon-color: rgb(var(--rgb-error-color, 219, 68, 55));
+        .icon-container.open {
+            --dww-color: rgb(var(--rgb-info-color, 3, 155, 229));
+            --dww-bg: rgba(var(--rgb-info-color, 3, 155, 229), 0.2);
         }
         .icon-container.countdown-active {
-            --dww-icon-color: rgb(var(--rgb-warning-color, 255, 166, 0));
+            --dww-color: rgb(var(--rgb-warning-color, 255, 166, 0));
+            --dww-bg: rgba(var(--rgb-warning-color, 255, 166, 0), 0.2);
+        }
+        .icon-container.alert-active {
+            --dww-color: rgb(var(--rgb-error-color, 219, 68, 55));
+            --dww-bg: rgba(var(--rgb-error-color, 219, 68, 55), 0.2);
         }
 
         .tile-icon {
@@ -79,60 +128,91 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            overflow: hidden;
+            background-color: var(--dww-bg);
             transition:
                 transform 180ms ease-in-out,
+                background-color 180ms ease-in-out,
                 box-shadow 180ms ease-in-out;
         }
         .icon-container:active .tile-icon {
             transform: scale(1.1);
         }
 
-        .tile-icon-bg {
-            position: absolute;
-            inset: 0;
-            background-color: transparent;
-            transition: background-color 180ms ease-in-out;
-        }
-
         .tile-icon ha-icon {
-            position: relative;
-            z-index: 1;
-            color: var(--dww-icon-color);
+            color: var(--dww-color);
             --mdc-icon-size: 24px;
             transition: color 180ms ease-in-out;
+        }
+
+        .ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 46px;
+            height: 46px;
+            transform: translate(-50%, -50%) rotate(-90deg);
+            pointer-events: none;
+        }
+        .ring circle {
+            fill: none;
+            stroke-width: 2.5;
+        }
+        .ring .track {
+            stroke: var(--dww-bg);
+        }
+        .ring .progress {
+            stroke: var(--dww-color);
+            stroke-linecap: round;
+            transition: stroke-dasharray 1s linear;
         }
 
         .alert-active .tile-icon {
             animation: pulse-glow 2s ease-in-out infinite;
         }
-        .countdown-active .tile-icon {
-            box-shadow: 0 0 12px 4px rgba(var(--rgb-warning-color, 255, 166, 0), 0.6);
+        @media (prefers-reduced-motion: reduce) {
+            .alert-active .tile-icon {
+                animation: none;
+            }
+            .ring .progress {
+                transition: none;
+            }
         }
-
         @keyframes pulse-glow {
             0% { box-shadow: 0 0 0 0 rgba(var(--rgb-error-color, 219, 68, 55), 0); }
             50% { box-shadow: 0 0 12px 4px rgba(var(--rgb-error-color, 219, 68, 55), 0.8); }
             100% { box-shadow: 0 0 0 0 rgba(var(--rgb-error-color, 219, 68, 55), 0); }
         }
 
+        .caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 10px;
+            line-height: 14px;
+            font-weight: 500;
+            font-variant-numeric: tabular-nums;
+            color: var(--dww-color);
+        }
+
         .count-badge {
             position: absolute;
-            top: 8px;
-            right: calc(50% - 26px);
-            min-width: 20px;
-            height: 20px;
-            padding: 0 6px;
+            top: 6px;
+            right: calc(50% - 28px);
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
             display: flex;
             align-items: center;
             justify-content: center;
-            background-color: rgb(var(--rgb-primary-color, 0, 154, 199));
+            background-color: var(--dww-color);
             color: var(--text-primary-color, white);
-            border-radius: 10px;
-            font-size: 12px;
+            border-radius: 9px;
+            font-size: 11px;
             font-weight: 500;
             line-height: 1;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            box-shadow: 0 0 0 2px var(--card-background-color, white);
             z-index: 2;
             box-sizing: border-box;
         }
@@ -144,26 +224,42 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
         if (!this.config) {
             return localize('card.no_config');
         }
-        const entity = this._hass?.states[this.config.entity];
+        const entity = this._entity;
         if (!entity) {
             return localize('card.entity_not_found', { entity: this.config.entity });
         }
 
-        const open_sensors = entity.attributes.open_sensors as OpenSensorInfo[];
-        const openCount = open_sensors?.length || 0;
+        const now = Date.now();
+        const openSensors = this.openSensors;
+        const openCount = openSensors.length;
+        const alertActive = entity.state == "on";
+        const nearest = openSensors
+            .filter(s => isCountingDown(s, now))
+            .sort((a, b) => secondsLeft(a.alert_at!, now) - secondsLeft(b.alert_at!, now))[0];
+        const countdownActive = !alertActive && nearest !== undefined;
+
         const iconClass = {
-            "alert-active": entity.state == "on",
-            "countdown-active": entity.state != "on" && open_sensors.some(s => s.remaining_seconds > 0),
             "icon-container": true,
+            "open": openCount > 0,
+            "alert-active": alertActive,
+            "countdown-active": countdownActive,
         };
+
+        // Share of the ring still drawn: full when an alert fires, draining toward the nearest alert otherwise.
+        const ringFraction = alertActive ? 1 : nearest ? 1 - fractionElapsed(nearest.opened_at, nearest.alert_at!, now) : 0;
 
         return html`
             <ha-card>
                 <div class=${classMap(iconClass)} @click=${this.openDialog}>
                     <div class="tile-icon">
-                        <div class="tile-icon-bg"></div>
-                        <ha-icon icon="mdi:window-open-variant"></ha-icon>
+                        <ha-icon icon=${openCount > 0 ? "mdi:window-open-variant" : "mdi:window-closed-variant"}></ha-icon>
                     </div>
+                    ${alertActive || countdownActive ? svg`
+                        <svg class="ring" viewBox="0 0 46 46">
+                            <circle class="track" cx="23" cy="23" r="21.5"></circle>
+                            <circle class="progress" cx="23" cy="23" r="21.5" pathLength="1" stroke-dasharray="${ringFraction} 1"></circle>
+                        </svg>` : ''}
+                    ${countdownActive ? html`<div class="caption">${formatMmSs(secondsLeft(nearest.alert_at!, now))}</div>` : ''}
                     ${openCount > 0 ? html`<div class="count-badge">${openCount}</div>` : ''}
                 </div>
             </ha-card>
@@ -187,11 +283,14 @@ export class DoorWindowWatcherCard extends LitElement implements LovelaceCard {
             },
         }));
 
-        window.addEventListener("dialog-closed", (ev: Event) => {
+        // HA fires dialog-closed for every dialog (e.g. more-info opened from a row), so wait for ours.
+        const onClosed = (ev: Event) => {
             if ((ev as CustomEvent).detail?.dialog === "door-window-watcher-dialog") {
                 this.dialogOpen = false;
+                window.removeEventListener("dialog-closed", onClosed);
             }
-        }, { once: true });
+        };
+        window.addEventListener("dialog-closed", onClosed);
     }
 }
 

@@ -18,7 +18,7 @@ def register_services(hass: HomeAssistant):
         only_alerts = call.data.get("only_alerts", False)
         processor: WatchersProcessor = hass.data[DOMAIN]["watchers_processor"]
         sensors = processor.get_open_sensors(only_alerts)
-        serialized = {"open_sensors:": [attr.asdict(sensor) for sensor in sensors]}
+        serialized = {"open_sensors": [attr.asdict(sensor) for sensor in sensors]}
         return serialized
 
     def get_sensors(call):
